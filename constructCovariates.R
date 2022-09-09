@@ -5,6 +5,11 @@ library(raster)
 library(sf)
 library(dplyr)
 library(rgeos)
+library(spatialEco)
+library(geojsonio)
+library(stringr)
+library(tidyr)
+library(janitor)
 
 # Covariates to run the lynx occupancy model
 # Grid cell on which covariates must be computed
@@ -12,8 +17,9 @@ load("data/gridFrComplete.RData")
 # Crop the grid to the study area extent (east of France)
 gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
 
+
 ##########################
-## Landscape cover data ##
+## LANDSCAPE COVER DATA ##
 ##########################
 # CLC data from 1990, 2000, 2006, 2012 and 2018
 clc1990 <- shapefile("data/CLC/CLC1990/CLC90_FR_RGF.shp")
@@ -77,6 +83,7 @@ extractPropCLC <- function(codesCLC){ # codesCLC as a vector of characters
 #############################
 ## Proportion of forest cover
 forestCov <- extractPropCLC(codesCLC = c("311", "312", "313"))
+colnames(forestCov) <- c("ID", "forest1990", "forest2000", "forest2006", "forest2012", "forest2018")
 
 
 ######################
@@ -160,31 +167,45 @@ connectForCov <- gridFr_connectFor %>%
 ############################
 ## Proportion of shrub cover 
 shrubCov <- extractPropCLC(codesCLC = c("321", "322", "323", "324"))
+colnames(shrubCov) <- c("ID", "shrub1990", "shrub2000", "shrub2006", "shrub2012", "shrub2018")
 
 
 ################################
 ## Proportion of open land cover 
 openLandCov <- extractPropCLC(codesCLC = c("331", "332", "333", "334", "335"))
+colnames(openLandCov) <- c("ID", "openLand1990", "openLand2000", "openLand2006", "openLand2012", "openLand2018")
 
 
 ##############################
 ## Proportion of agri 21 cover
 agri21Cov <- extractPropCLC(codesCLC = c("211", "213"))
+colnames(agri21Cov) <- c("ID", "agri21_1990", "agri21_2000", "agri21_2006", "agri21_2012", "agri21_2018")
 
 
 ##############################
 ## Proportion of agri 22 cover
 agri22Cov <- extractPropCLC(codesCLC = c("221", "222", "223"))
+colnames(agri22Cov) <- c("ID", "agri22_1990", "agri22_2000", "agri22_2006", "agri22_2012", "agri22_2018")
 
 
 ############
 ## Proportion of agri 23 cover
 agri23Cov <- extractPropCLC(codesCLC = "231")
+colnames(agri23Cov) <- c("ID", "agri23_1990", "agri23_2000", "agri23_2006", "agri23_2012", "agri23_2018")
 
 
 ############
 ## Proportion of agri 24 cover
 agri24Cov <- extractPropCLC(codesCLC = c("241", "242", "243", "244"))
+colnames(agri24Cov) <- c("ID", "agri24_1990", "agri24_2000", "agri24_2006", "agri24_2012", "agri24_2018")
+
+
+##################
+## Save covariates
+save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, 
+     agri23Cov, agri24Cov, file = "outputs/covariatesCover.RData")
+
+##########################################################
 
 
 ###############
@@ -246,18 +267,34 @@ listRoads[[3]] <- roads2020Tr
 # Total road length in each cell
 roadLengthCov <- data.frame(ID = gridFrComplete$ID)
 
+# Need to cut the grid into cell sequences otherwise the following functions fail with too many cells
+cutSeq <- seq(1, 2131, 100) 
+cutCells <- list()
+for(i in 1:(length(cutSeq) - 1)){
+  cutCells[[i]] <- seq(cutSeq[i], cutSeq[i + 1] - 1, by = 1)
+}
+cutCells[[22]] <- 2101:2131
+
 for(i in 1:length(listRoads)){
   
-  roadsIn <- raster::intersect(listRoads[[i]], gridFrComplete) # extract all the roads inside each cell
-  lengthAllRoads <- gLength(roadsIn, byid = TRUE) # calculate the length of each type of road per cell ID
-  lengthRoadsCells <- aggregate(lengthAllRoads, by = list(ID = roadsIn$FID), FUN = function(x)sum(x, na.rm = TRUE)) # and sum the length per cell ID
-  withoutRoads <- setdiff(out$FID, lengthRoadsCells$ID) # cells without roads in it
+  lengthRoadsCells <- data.frame(ID = numeric(), x = numeric())
+  for(j in 1:length(cutCells)){
+    
+    roadsIn <- raster::intersect(listRoads[[i]], gridFrComplete[cutCells[[j]],]) # extract all the roads inside each cell
+    lengthAllRoads <- gLength(roadsIn, byid = TRUE) # calculate the length of each type of road per cell ID
+    lengthRoadsCellCut <- aggregate(lengthAllRoads, by = list(ID = roadsIn$ID), FUN = function(x)sum(x, na.rm = TRUE)) # and sum the length per cell ID
+    lengthRoadsCells <- rbind.data.frame(lengthRoadsCells, lengthRoadsCellCut)
+    save(lengthRoadsCells, file = "outputs/lengthRoadsCellsTemp.RData")
+    print(j)
+  }
+  
+  withoutRoads <- setdiff(gridFrComplete$ID, lengthRoadsCells$ID) # cells without roads in it
   lengthRoadsID <- c(as.numeric(as.character(lengthRoadsCells$ID)), as.numeric(as.character(withoutRoads)))
   lengthRoads <- c(lengthRoadsCells$x, rep(0, length(withoutRoads))) # put 0 as the length of roads in the empty cells
   lengthRoadsOrder <- cbind(lengthRoadsID, lengthRoads)
-  lengthRoadsOrderID <- lengthRoadsOrder[order(match(lengthRoadsOrder[,"lengthRoadsID"] ,out@data$FID)),]
+  lengthRoadsOrderID <- lengthRoadsOrder[order(match(lengthRoadsOrder[,"lengthRoadsID"] ,gridFrComplete$ID)),]
 
-  roadLengthCov <- cbind.data.frame(roadLengthCov, as.data.frame(lengthRoadsOrderID))
+  roadLengthCov <- cbind.data.frame(roadLengthCov, as.data.frame(lengthRoadsOrderID)[,"lengthRoads"])
   if(i == 1){
     colnames(roadLengthCov)[i+1] <- "roadLength2012"
   } else if(i == 2){
@@ -268,26 +305,255 @@ for(i in 1:length(listRoads)){
 }
 
 
-###################
-## Human density ##
-###################
+##################
+## Save covariates
+save(distHgwCov, roadLengthCov, file = "outputs/covariatesRoads.RData")
+
+###############################################################
 
 
+###########################
+## HUMAN POPULATION DATA ##
+###########################
+# Human density for cells of 1km2 in 2017
+human <- shapefile("data/humanPop/2017/Filosofi2017_carreaux_1km_met.shp")
+human_sf <- st_as_sf(human)
 
-##############
-## Rugosity ##
-##############
-
-#######################
-## Prey availability ##
-#######################
-
-#######################
-## Human disturbance ##
-#######################
+gridFr_sf <- st_as_sf(gridFrComplete) %>%
+  st_transform(crs = st_crs(human_sf))
 
 
+################
+## Human density
+# Compute the mean human density (1km2) into the 10km2 cells
+humanDens <- st_intersection(gridFr_sf , human_sf) %>%
+  group_by(ID) %>%
+  summarise(humanDens1km2 = mean(Ind, na.rm = TRUE)) %>%
+  as_tibble() %>%
+  select(ID, humanDens1km2)
+# Fill with 0 the missing data
+hDensCov <- data.frame(ID = gridFrComplete$ID)
+hDensCov <- merge(hDensCov, as.data.frame(humanDens), all = TRUE)
+hDensCov[is.na(hDensCov)] <- 0
 
 
-save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, 
-     agri23Cov, distHgwCov, roadLengthCov, file = "covariates.RData")
+####################
+## ELEVATION DATA ##
+####################
+# Elevation data on 25 m x 25 m resolution
+elev1 <- raster("data/elevation/032ab314564b9cb72c98fbeb093aeaf69720fbfd/eu_dem_v11_E30N20.TIF")# 
+gridFrCompleteTr <- spTransform(gridFrComplete, elev1@crs)
+elev1 <- crop(elev1, extent(gridFrCompleteTr))
+elev2 <- raster("data/elevation/97824c12f357f50638d665b5a58707cd82857d57/eu_dem_v11_E40N20.TIF")
+elev2 <- crop(elev2, extent(gridFrCompleteTr))
+elevation <- merge(elev1, elev2)
+
+
+#############
+## Ruggedness
+# Compute TRI (terrain ruggedness index) on 1 km2 cells
+elevAggr <- aggregate(elevation, fact = 40)
+elevTRI <- tri(elevAggr)
+
+# Compute the number of 1km2 "rugged cells" into 10 km2 cells
+elevTRI[elevTRI < 162] <- 0 # 162 = "intermediately rugged surface"
+elevTRI[elevTRI >= 162] <- 0.01
+elevTRI_10km2 <- aggregate(elevTRI, fact = 10, fun = sum)
+triCells <- raster::extract(elevTRI_10km2, gCentroid(gridFrCompleteTr, byid = TRUE))
+triCov <- cbind.data.frame(ID = gridFrCompleteTr@data$ID, tri = triCells)
+
+
+################
+## TALLY DATA ##
+################
+# Deer number allowed for hunting
+raw_attrib <- read.csv("data/tally/attributionsChevreuil_v2.txt", sep = ";")
+# Real number of deer hunted
+raw_realiz <- read.csv("data/tally/realisationsChevreuil_v2.txt", sep = ";")
+# "Communes" polygons
+communes <- geojson_read("data/tally/communes.geojson",  what = "sp")
+
+
+####################
+## Prey availability
+# Merge deer number with "communes"
+communes@data$nom <- str_to_lower(communes@data$nom) # to lowercase
+communes@data$nom <- stringi::stri_trans_general(communes@data$nom, "Latin-ASCII") # remove accent
+
+# Clean number of deer allowed and hunted
+attrib <- raw_attrib %>%
+  janitor::clean_names() %>%
+  mutate(nom = str_to_lower(nom)) %>% # to lowercase
+  mutate(nom = stringi::stri_trans_general(nom, "Latin-ASCII")) %>% # remove accent
+  pivot_longer(cols = x1985:x2020, names_to = "year", values_to = "attrib") %>%
+  mutate(year = str_remove(year, "x"),
+         year = as.integer(year),
+         code_insee = as.character(code_insee))
+
+realiz <- raw_realiz %>%
+  janitor::clean_names() %>%
+  mutate(nom = str_to_lower(nom)) %>% # to lowercase
+  mutate(nom = stringi::stri_trans_general(nom, "Latin-ASCII")) %>% # remove accent
+  pivot_longer(cols = x1985:x2020, names_to = "year", values_to = "realiz") %>%
+  mutate(year = str_remove(year, "x"),
+         year = as.integer(year),
+         code_insee = as.character(code_insee))
+
+# Remove data for which there is no commune polygon associated
+attrib <- attrib[attrib$nom %in% communes$nom,]
+attrib <- attrib[!is.na(attrib$attrib),]
+realiz <- realiz[realiz$nom %in% communes$nom,]
+realiz <- realiz[!is.na(realiz$realiz),]
+# Merge number allowed and hunted
+attribReal <- attrib %>% 
+  full_join(realiz)
+# And with the communes
+communes_all <- communes %>%
+  st_as_sf() %>%
+  rename("code_insee" = "code")  %>%
+  inner_join(attribReal)
+
+# Cut commune polygons with the grid cells
+gridFr_sf <- st_as_sf(gridFrComplete) %>%
+  st_transform(crs = st_crs(communes_all))
+
+# Need to cut the grid into cell sequences otherwise the following function fails with too many cells
+cutSeq <- seq(1, 2131, 50) 
+cutCells <- list()
+for(i in 1:(length(cutSeq) - 1)){
+  cutCells[[i]] <- seq(cutSeq[i], cutSeq[i + 1] - 1, by = 1)
+}
+cutCells[[43]] <- 2101:2131
+
+gridPreys <- st_intersection(gridFr_sf[cutCells[[1]],], communes_all)
+for(j in 2:length(cutCells)){
+  gridPreysCut <- st_intersection(gridFr_sf[cutCells[[j]],], communes_all)
+  gridPreys <- rbind(gridPreys, gridPreysCut)
+  save(gridPreys, file = "outputs/gridPreysTemp.RData")
+  print(j)
+} 
+gridPreys$area <- st_area(gridPreys)
+
+# Compute the portion of the number of deer allowed/hunted in each commune portion in the grid cells
+gridPreys2 <- gridPreys %>%
+  mutate(portAttrib = as.numeric((area / 1e+08) * attrib)) %>% 
+  mutate(portReal = as.numeric((area / 1e+08) * realiz)) %>% 
+  group_by(ID, year) %>%
+  summarise(sumAttrib = sum(portAttrib, na.rm = TRUE), sumReal = sum(portReal, na.rm = TRUE))
+
+gridPreys3 <- gridFr_sf %>%
+  left_join(as.data.frame(gridPreys2)[,c("ID", "year", "sumAttrib", "sumReal")])
+gridPreys3 <- gridPreys3[!is.na(gridPreys3$year),]
+
+# Compute how much of the allowed number of deer are actually hunted
+portHunted <- gridPreys3[(gridPreys3$sumAttrib != 0 & gridPreys3$sumReal != 0 & 
+                      gridPreys3$sumReal < gridPreys3$sumAttrib), "sumReal"] / 
+          gridPreys3[(gridPreys3$sumAttrib != 0 & gridPreys3$sumReal != 0 & 
+                        gridPreys3$sumReal < gridPreys3$sumAttrib), "sumAttrib"]
+# Take this portion of allowed number of deer to fill the NA in hunted numbers
+gridPreys3Fill <- gridPreys3 %>% 
+  mutate(sumReal = ifelse(is.na(sumReal), sumAttrib * mean(portHunted[,1], na.rm = TRUE), sumReal))
+
+# Convert each year data as a column and complete the cells to obtain the full grid
+gridPivot <- gridPreys3 %>% 
+  as_tibble() %>% 
+  select(ID, year, sumReal) %>% 
+  pivot_wider(names_from = year, values_from = sumReal)
+
+# Merge to the grid cells
+gridPreys4 <- gridFr_sf %>% 
+  full_join(gridPivot)
+
+# Fill the NA cells with the mean of all 8 surrounding cells
+yearList <- c(1985, 1993, 1998, 2002, 2007, 2012, 2015, 2016, 2017, 2018, 2019, 2020)
+
+gridPreys4DF <- gridPreys4 %>% 
+  st_drop_geometry() %>% 
+  as.data.frame()
+
+# While there are still NA cells, keep filling them
+for(y in yearList){
+    
+  # Identify the 8 surrounding cells around the NA cells
+  # Cells for the selected year
+  cellYear <- gridPreys4 %>% 
+    select(ID, as.character(y))
+  # Cells which are NA
+  cellYearNA <- cellYear %>% 
+    as_data_frame()
+  cellYearNAID <- cellYearNA[is.na(cellYearNA[,2]),1] %>% pull(ID)
+    
+  while(length(cellYearNAID) != 0){
+    
+    # Buffer around NA cells
+    bufferYear <- gridFr_sf %>% 
+      filter(ID %in% cellYearNAID)
+    
+    neighborsCells <- bufferYear %>% 
+      st_buffer(dist = 9999) %>%  # one cell (a bit less)
+      st_intersection(gridPreys4)
+
+    # Buffer of cells which are NA
+    bufferYear2 <- neighborsCells %>% 
+      group_by(ID) %>% 
+      mutate(!!paste0("mean", quo_name(as.character(y))) := 
+               mean(!!as.name(quo_name(as.character(y))), na.rm = TRUE))
+    
+    # Replace the NA cells with the mean value
+    bufferYear2ID <- bufferYear2 %>% pull(ID)
+    bufferYear2Mean <- bufferYear2 %>% pull(!!paste0("mean", quo_name(as.character(y))))
+    bufferYear2MeanID <- unique(cbind.data.frame(bufferYear2ID = bufferYear2ID, bufferYear2Mean = bufferYear2Mean))
+    bufferYear2MeanID <- bufferYear2MeanID[!is.na(bufferYear2MeanID$bufferYear2Mean),]
+    bufferYear2MeanID <- bufferYear2MeanID[order(bufferYear2MeanID$bufferYear2ID),]
+    
+    gridPivot2DF[gridPivot2DF$ID %in% bufferYear2MeanID$bufferYear2ID, as.character(y)] <- 
+      bufferYear2MeanID$bufferYear2Mean
+    
+  }
+  
+  gridPivot2 <- gridPivot2 %>% 
+    mutate("1985" = gridPreys4DF$`1985`,
+           "1993" = gridPreys4DF$`1993`,
+           "1998" = gridPreys4DF$`1998`,
+           "2002" = gridPreys4DF$`2002`,
+           "2007" = gridPreys4DF$`2007`,
+           "2012" = gridPreys4DF$`2012`,
+           "2015" = gridPreys4DF$`2015`,
+           "2016" = gridPreys4DF$`2016`,
+           "2017" = gridPreys4DF$`2017`,
+           "2018" = gridPreys4DF$`2018`,
+           "2019" = gridPreys4DF$`2019`,
+           "2020" = gridPreys4DF$`2020`) 
+}
+
+preyCov <- gridPreys4
+
+
+###########################
+## HUMAN FOOTPRINT INDEX ##
+###########################
+# HFI data
+hfi_1993 <- raster("data/HFI/1993/wildareas-v3-1993-human-footprint.tif")
+hfi_2009 <- raster("data/HFI/2009/wildareas-v3-2009-human-footprint.tif")
+
+
+####################
+## Human disturbance 
+gridFr_sf <- st_as_sf(gridFrComplete) %>%
+  st_transform(crs = st_crs(hfi_1993@crs))
+# Mean HFI per grid cells
+hfiCells_1993 <- raster::extract(hfi_1993, gridFr_sf)
+hfiCells_2009 <- raster::extract(hfi_2009, gridFr_sf)
+
+hfiCov <- cbind.data.frame(ID = gridFrComplete@data$ID, 
+                           hfi_1993 = unlist(lapply(hfiCells_1993, mean)),
+                           hfi_2009 = unlist(lapply(hfiCells_2009, mean)))
+
+
+##################
+## Save covariates
+save(hDensCov, triCov, preyCov, hfiCov, file = "outputs/covariatesOthers.RData")
+
+########################################################################
+
+
