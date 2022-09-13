@@ -467,66 +467,53 @@ gridPreys4 <- gridFr_sf %>%
 # Fill the NA cells with the mean of all 8 surrounding cells
 yearList <- c(1985, 1993, 1998, 2002, 2007, 2012, 2015, 2016, 2017, 2018, 2019, 2020)
 
-gridPreys4DF <- gridPreys4 %>% 
+# Identify the 8 neighboring cells
+buffer <- gridPreys4 %>% 
+  st_buffer(dist = 9000) %>% # one cell (a bit less)
+  rename(IDbuffer = ID) %>% 
+  select(IDbuffer)
+
+bufferCells <- st_intersection(buffer[cutCells[[1]],], gridPreys4)
+for(j in 2:length(cutCells)){
+  bufferCellsCut <- st_intersection(buffer[cutCells[[j]],], gridPreys4)
+  bufferCells <- rbind(bufferCells, bufferCellsCut)
+  save(bufferCells, file = "outputs/bufferCellsTemp.RData")
+  print(j)
+} 
+
+preyCov <- gridPreys4 %>% 
   st_drop_geometry() %>% 
-  as.data.frame()
+  as.data.frame() %>% 
+  select(-area)
 
-# While there are still NA cells, keep filling them
+# As long as there are NA, fill the cells
 for(y in yearList){
-    
-  # Identify the 8 surrounding cells around the NA cells
-  # Cells for the selected year
-  cellYear <- gridPreys4 %>% 
-    select(ID, as.character(y))
-  # Cells which are NA
-  cellYearNA <- cellYear %>% 
-    as_data_frame()
-  cellYearNAID <- cellYearNA[is.na(cellYearNA[,2]),1] %>% pull(ID)
-    
-  while(length(cellYearNAID) != 0){
-    
-    # Buffer around NA cells
-    bufferYear <- gridFr_sf %>% 
-      filter(ID %in% cellYearNAID)
-    
-    neighborsCells <- bufferYear %>% 
-      st_buffer(dist = 9999) %>%  # one cell (a bit less)
-      st_intersection(gridPreys4)
-
-    # Buffer of cells which are NA
-    bufferYear2 <- neighborsCells %>% 
-      group_by(ID) %>% 
-      mutate(!!paste0("mean", quo_name(as.character(y))) := 
-               mean(!!as.name(quo_name(as.character(y))), na.rm = TRUE))
-    
-    # Replace the NA cells with the mean value
-    bufferYear2ID <- bufferYear2 %>% pull(ID)
-    bufferYear2Mean <- bufferYear2 %>% pull(!!paste0("mean", quo_name(as.character(y))))
-    bufferYear2MeanID <- unique(cbind.data.frame(bufferYear2ID = bufferYear2ID, bufferYear2Mean = bufferYear2Mean))
-    bufferYear2MeanID <- bufferYear2MeanID[!is.na(bufferYear2MeanID$bufferYear2Mean),]
-    bufferYear2MeanID <- bufferYear2MeanID[order(bufferYear2MeanID$bufferYear2ID),]
-    
-    gridPivot2DF[gridPivot2DF$ID %in% bufferYear2MeanID$bufferYear2ID, as.character(y)] <- 
-      bufferYear2MeanID$bufferYear2Mean
-    
-  }
   
-  gridPivot2 <- gridPivot2 %>% 
-    mutate("1985" = gridPreys4DF$`1985`,
-           "1993" = gridPreys4DF$`1993`,
-           "1998" = gridPreys4DF$`1998`,
-           "2002" = gridPreys4DF$`2002`,
-           "2007" = gridPreys4DF$`2007`,
-           "2012" = gridPreys4DF$`2012`,
-           "2015" = gridPreys4DF$`2015`,
-           "2016" = gridPreys4DF$`2016`,
-           "2017" = gridPreys4DF$`2017`,
-           "2018" = gridPreys4DF$`2018`,
-           "2019" = gridPreys4DF$`2019`,
-           "2020" = gridPreys4DF$`2020`) 
-}
+  while(sum(is.na(preyCov[, as.character(y)])) != 0){
+      
+    # Cells which are NA
+    cellYearNAID <- preyCov %>% 
+      select(ID, as.character(y)) %>% 
+      filter(is.na(.[, 2])) %>% 
+      pull(ID)
+    
+    # Buffer of cells which are NA
+    bufferYearNA <- bufferCells %>% 
+      select(IDbuffer, paste0("X", as.character(y))) %>%
+      filter(IDbuffer %in% cellYearNAID) %>% 
+      st_drop_geometry() %>% 
+      group_by(IDbuffer) %>% 
+      summarise(!!paste0("mean", quo_name(as.character(y))) := 
+               mean(!!as.name(quo_name(paste0("X", as.character(y)))), na.rm = TRUE))
 
-preyCov <- gridPreys4
+    # Replace the mean value in the NA cells
+    preyCov[preyCov$ID %in% bufferYearNA$IDbuffer, as.character(y)] <- pull(bufferYearNA, 2)
+    mergeBuff <- merge(preyCov[, c("ID", as.character(y))], data.frame(ID = pull(bufferCells, "ID")), all.y = TRUE)
+    newValue <- mergeBuff[match(pull(bufferCells, "ID"), mergeBuff$ID), as.character(y)]
+    bufferCells[, paste0("X", as.character(y))] <- newValue
+  }
+  print(y)
+}
 
 
 ###########################
