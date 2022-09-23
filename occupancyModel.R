@@ -3,6 +3,8 @@ setwd("C:/Users/sarah.bauduin/Documents/GitHub/appendix_lynxOccupancy/")
 
 library(raster)
 library(lubridate)
+library(sf)
+library(jagsUI)
 
 # Occupancy model
 
@@ -18,12 +20,19 @@ cov <- cbind.data.frame(forestCov, connectForCov[,-1], shrubCov[,-1],
                         roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], 
                         preyCov[,-1], hfiCov[,-1])
 
-covScale <- scale(cov) # scaling by column
 
 # Grid cell on which lynx presence data are identified
 load("data/gridFrComplete.RData")
 # Crop the grid to the study area extent (east of France)
 gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
+
+# # Look at the covariates
+# gridFrCompleteCov <- gridFrComplete
+# gridFrCompleteCov@data <- cbind.data.frame(gridFrCompleteCov@data, cov, effort)
+# gridFrCompleteCovSf <- st_as_sf(gridFrCompleteCov)
+# for(i in 1:ncol(gridFrCompleteCovSf)){
+#   plot(gridFrCompleteCovSf[,i])
+# }
 
 # Lynx presence data
 lynxData1 <- read.csv("data/lynx/lynx_INDallR.csv", header = TRUE, sep = ";")
@@ -138,20 +147,198 @@ for(i in 1:nrow(samplEffort)){
   }
 }
 
-# Change format of obsLynx
-obsLynx2 <- obsLynx[, , 1]
-for (i in 2:dim(obsLynx)[3]){
-  obsLynx2 <- cbind(obsLynx2, obsLynx[, , i])
-}
-dim(obsLynx2) # 2131 (n cells in the grid) x (6 months x yearStart to yearEnd)
-
 # Which cell were never sampled across all years
-noSampl <- apply(obsLynx2, 1, function(x) all(is.na(x)))
+noSampl <- apply(obsLynx, 1, function(x) all(is.na(x)))
 sum(noSampl)
 # Remove cells never samples
-covScaleSampl <- covScale[!noSampl,]
+covSampl <- cov[!noSampl,]
 samplEffortSampl <- samplEffort[!noSampl,]
-obsLynx2Sampl <- obsLynx2[!noSampl,]
+obsLynxSampl <- obsLynx[!noSampl,,]
+
+# Dataset characteristics
+nSites <- dim(obsLynxSampl)[1]
+nVisits <- dim(obsLynxSampl)[2]
+nYears <- dim(obsLynxSampl)[3]
+
+# Scaling the covariates
+covScale <- scale(covSampl) # scaling by column
+binaryEffort <- ifelse(samplEffortSampl > 0, 1, 0)
+effortScale <- scale(samplEffortSampl)
+# Duplicate values in-between years for the missing years
+rep.col <- function(x, n){
+  matrix(rep(x, each = n), ncol = n, byrow = TRUE)
+}
+forestCov <- cbind(rep.col(covScale[, "forest1990"], 7), # from winter 93/94 to winter 99/00
+                   rep.col(covScale[, "forest2000"], 6), # from winter 00/01 to winter 05/06
+                   rep.col(covScale[, "forest2006"], 6), # from winter 06/07 to winter 11/12
+                   rep.col(covScale[, "forest2012"], 6), # from winter 12/13 to winter 17/18
+                   rep.col(covScale[, "forest2018"], 2)) # from winter 18/19 to winter 19/20
+connectForestCov <- cbind(rep.col(covScale[, "connectFor90"], 7), # from winter 93/94 to winter 99/00
+                          rep.col(covScale[, "connectFor00"], 6), # from winter 00/01 to winter 05/06
+                          rep.col(covScale[, "connectFor06"], 6), # from winter 06/07 to winter 11/12
+                          rep.col(covScale[, "connectFor12"], 6), # from winter 12/13 to winter 17/18
+                          rep.col(covScale[, "connectFor18"], 2)) # from winter 18/19 to winter 19/20
+shrubCov <- cbind(rep.col(covScale[, "shrub1990"], 7), # from winter 93/94 to winter 99/00
+                  rep.col(covScale[, "shrub2000"], 6), # from winter 00/01 to winter 05/06
+                  rep.col(covScale[, "shrub2006"], 6), # from winter 06/07 to winter 11/12
+                  rep.col(covScale[, "shrub2012"], 6), # from winter 12/13 to winter 17/18
+                  rep.col(covScale[, "shrub2018"], 2)) # from winter 18/19 to winter 19/20
+openLandCov <- cbind(rep.col(covScale[, "openLand1990"], 7), # from winter 93/94 to winter 99/00
+                     rep.col(covScale[, "openLand2000"], 6), # from winter 00/01 to winter 05/06
+                     rep.col(covScale[, "openLand2006"], 6), # from winter 06/07 to winter 11/12
+                     rep.col(covScale[, "openLand2012"], 6), # from winter 12/13 to winter 17/18
+                     rep.col(covScale[, "openLand2018"], 2)) # from winter 18/19 to winter 19/20
+agri21Cov <- cbind(rep.col(covScale[, "agri21_1990"], 7), # from winter 93/94 to winter 99/00
+                   rep.col(covScale[, "agri21_2000"], 6), # from winter 00/01 to winter 05/06
+                   rep.col(covScale[, "agri21_2006"], 6), # from winter 06/07 to winter 11/12
+                   rep.col(covScale[, "agri21_2012"], 6), # from winter 12/13 to winter 17/18
+                   rep.col(covScale[, "agri21_2018"], 2)) # from winter 18/19 to winter 19/20
+agri22Cov <- cbind(rep.col(covScale[, "agri22_1990"], 7), # from winter 93/94 to winter 99/00
+                   rep.col(covScale[, "agri22_2000"], 6), # from winter 00/01 to winter 05/06
+                   rep.col(covScale[, "agri22_2006"], 6), # from winter 06/07 to winter 11/12
+                   rep.col(covScale[, "agri22_2012"], 6), # from winter 12/13 to winter 17/18
+                   rep.col(covScale[, "agri22_2018"], 2)) # from winter 18/19 to winter 19/20
+agri23Cov <- cbind(rep.col(covScale[, "agri23_1990"], 7), # from winter 93/94 to winter 99/00
+                   rep.col(covScale[, "agri23_2000"], 6), # from winter 00/01 to winter 05/06
+                   rep.col(covScale[, "agri23_2006"], 6), # from winter 06/07 to winter 11/12
+                   rep.col(covScale[, "agri23_2012"], 6), # from winter 12/13 to winter 17/18
+                   rep.col(covScale[, "agri23_2018"], 2)) # from winter 18/19 to winter 19/20
+agri24Cov <- cbind(rep.col(covScale[, "agri24_1990"], 7), # from winter 93/94 to winter 99/00
+                   rep.col(covScale[, "agri24_2000"], 6), # from winter 00/01 to winter 05/06
+                   rep.col(covScale[, "agri24_2006"], 6), # from winter 06/07 to winter 11/12
+                   rep.col(covScale[, "agri24_2012"], 6), # from winter 12/13 to winter 17/18
+                   rep.col(covScale[, "agri24_2018"], 2)) # from winter 18/19 to winter 19/20
+distHighwayCov <- cbind(rep.col(covScale[, "distHgw2012"], 22), # from winter 93/94 to winter 14/15
+                        rep.col(covScale[, "distHgw2015"], 3), # from winter 15/16 to winter 17/18
+                        rep.col(covScale[, "distHgw2018"], 2)) # from winter 18/19 to winter 19/20
+roadLengthCov <- cbind(rep.col(covScale[, "roadLength2012"], 22), # from winter 93/94 to winter 14/15
+                       rep.col(covScale[, "roadLength2015"], 3), # from winter 15/16 to winter 17/18
+                       rep.col(covScale[, "roadLength2018"], 2)) # from winter 18/19 to winter 19/20
+preyCov <- cbind(rep.col(covScale[, "prey1993"], 5), # from winter 93/94 to winter 97/98
+                 rep.col(covScale[, "prey1998"], 4), # from winter 98/99 to winter 01/02
+                 rep.col(covScale[, "prey2002"], 5), # from winter 02/03 to winter 06/07
+                 rep.col(covScale[, "prey2007"], 5), # from winter 07/08 to winter 11/12
+                 rep.col(covScale[, "prey2012"], 5), # from winter 12/13 to winter 16/17
+                 rep.col(covScale[, "prey2017"], 2), # from winter 17/18 to winter 18/19
+                 rep.col(covScale[, "prey2019"], 1)) #  winter 19/20
+hfiCov <- cbind(rep.col(covScale[, "hfi_1993"], 16), # from winter 93/94 to winter 08/09
+                rep.col(covScale[, "hfi_2009"], 11)) # from winter 09/10 to winter 19/20
+
+# List of data to run the model
+dataFull <- list(nSites = nSites, 
+              nVisits = nVisits, 
+              nYears = nYears, 
+              effort = effortScale, 
+              forest = forestCov, 
+              connectForest = connectForestCov,
+              shrub = shrubCov,
+              openLand = openLandCov,
+              agri21 = agri21Cov,
+              agri22 = agri22Cov,
+              agri23 = agri23Cov,
+              agri24 = agri24Cov,
+              distHighway = distHighwayCov,
+              roadLengthCov = roadLengthCov,
+              hDens = covScale[, "hDensCov[, -1]"],
+              tri = covScale[, "triCov[, -1]"],
+              prey = preyCov,
+              hfi = hfiCov,
+              binaryEffort = binaryEffort,
+              nSitesYear = apply(binaryEffort, 2, sum),
+              y = apply(obsLynxSampl, c(1, 3), sum))
+
+# Model
+model <- 
+  paste("
+model
+{
+  # State model priors
+  b[1] ~ dnorm(mu.b, 1) # Random walk prior on year effect
+  for(j in 2:nYears){
+    b[j] ~ dnorm(b[j - 1], tau.b)
+  }
+  tau.b <- 1 / (sd.b * sd.b)
+  mu.b ~ dnorm(0, 1)
+  sd.b ~ dunif(0, 5) # Half-uniform hyperpriors
+  
+  for (i in 1:nSites){
+    u[i] ~ dnorm(0, tau.u) # Random site effect      
+  } 
+  tau.u <- 1 / (sd.u * sd.u)
+  sd.u ~ dunif(0, 5) # Half-uniform hyperpriors
+  
+  # Priors for alpha and beta coeffs
+  for(i in 1:2) {
+    beta[i]  ~ dnorm(0, 1)
+  }
+  for(i in 1:14) {
+    alpha[i] ~ dnorm(0, 1)
+  }
+  for(i in 1:nSites) {
+    for(j in 1:nYears) {
+      logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
+        alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * roadLengthCov[i, j] + 
+        alpha[11] * hDens[i] + alpha[12] * tri[i] + alpha[13] * prey[i, j] + alpha[14] * hfi[i, j] +
+        b[j] + u[i]
+      z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
+      lp[i, j] <- beta[1] + beta[2] * effort[i, j]
+      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(- binaryEffort[i, j]))
+      y[i, j] ~ dbin(p[i, j] * z[i, j], nVisits) # Likelihood
+    }
+  }
+  
+  # Finite sample occupancy - proportion of occupied sites
+  for (j in 1:nYears) {
+    psi.fs[j] <- sum(z[1:nSites, j]) / nSitesYear[j]
+  }
+}
+")
+writeLines(model,"modelOcc.txt")
+
+# Initial value
+zst <- dataFull$y
+zst[zst > 0] <- 1
+init1 <- list(alpha = runif(10, -2, 2),
+              beta = runif(2, -2, 2),
+              z = zst,
+              b = rep(0, nYears),
+              mu.b = 0,
+              u = rep(0, nSites),
+              sd.b = 1,
+              sd.u = 1)
+init2 <- list(alpha = runif(10, -2, 2),
+              beta = runif(2, -2, 2),
+              z = zst,
+              b = rep(0, nYears),
+              mu.b = 0,
+              u = rep(0, nSites),
+              sd.b = 1,
+              sd.u = 1)
+inits <- list(init1, init2)
+
+# Parameters to be monitored
+parameters <- c("psi.fs",
+                "alpha",
+                "beta",
+                "b",
+                "mu.b",
+                "sd.u",
+                "sd.b",
+                "z")
+
+# Run the model
+lynxSim <- jags(data = dataFull, 
+                inits = inits, 
+                parameters = parameters,
+                n.iter = 10000,
+                model.file = "ModelOcc.txt",
+                n.chains = 2,
+                n.burnin = 2500)
+save(lynxSim, file="outputs/lynxZ.RData")
+
+# Summary results
+round(lynxSim$summary, 2)
 
 
 

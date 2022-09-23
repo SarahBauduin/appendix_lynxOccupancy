@@ -1,0 +1,45 @@
+
+model
+{
+  # State model priors
+  b[1] ~ dnorm(mu.b, 1) # Random walk prior on year effect
+  for(j in 2:nYears){
+    b[j] ~ dnorm(b[j - 1], tau.b)
+  }
+  tau.b <- 1 / (sd.b * sd.b)
+  mu.b ~ dnorm(0, 1)
+  sd.b ~ dunif(0, 5) # Half-uniform hyperpriors
+  
+  for (i in 1:nSites){
+    u[i] ~ dnorm(0, tau.u) # Random site effect      
+  } 
+  tau.u <- 1 / (sd.u * sd.u)
+  sd.u ~ dunif(0, 5) # Half-uniform hyperpriors
+  
+  # Priors for alpha and beta coeffs
+  for(i in 1:2) {
+    beta[i]  ~ dnorm(0, 1)
+  }
+  for(i in 1:12) {
+    alpha[i] ~ dnorm(0, 1)
+  }
+  for(i in 1:nSites) {
+    for(j in 1:nYears) {
+      logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
+        alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
+        alpha[8] * agri24[i, j] + alpha[9] * hfi[i, j] + alpha[10] * prey[i, j] + 
+        alpha[11] * hDens[i] + alpha[12] * tri[i] +
+        b[j] + u[i]
+      z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
+      lp[i, j] <- beta[1] + beta[2] * effort[i, j]
+      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(- binaryEffort[i, j]))
+      y[i, j] ~ dbin(p[i, j] * z[i, j], nVisits) # Likelihood
+    }
+  }
+  
+  # Finite sample occupancy - proportion of occupied sites
+  for (j in 1:nYears) {
+    psi.fs[j] <- sum(z[1:nSites, j]) / nSitesYear[j]
+  }
+}
+
