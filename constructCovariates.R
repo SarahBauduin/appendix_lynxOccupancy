@@ -211,24 +211,24 @@ save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov,
 ###############
 ## ROAD DATA ##
 ###############
-# Route500 data from 2012, 2016, and 2020
+# Route500 data from 2012, 2015, and 2018
 roads2012 <- shapefile("data/route500/2012/TRONCON_ROUTE.shp")
 highways2012 <- roads2012[roads2012$VOCATION == "Type autoroutier", ]
-roads2016 <- shapefile("data/route500/2016/TRONCON_ROUTE.shp")
-highways2016 <- roads2016[roads2016$VOCATION == "Type autoroutier", ]
-roads2020 <- shapefile("data/route500/2020/TRONCON_ROUTE.shp")
-highways2020 <- roads2020[roads2020$VOCATION == "Type autoroutier", ]
+roads2015 <- shapefile("data/route500/2015/TRONCON_ROUTE.shp")
+highways2015 <- roads2015[roads2015$VOCATION == "Type autoroutier", ]
+roads2018 <- shapefile("data/route500/2018/TRONCON_ROUTE.shp")
+highways2018 <- roads2018[roads2018$VOCATION == "Type autoroutier", ]
 
 
 #######################
 ## Distance to highways
 highways2012Tr <- spTransform(highways2012, CRS(proj4string(gridFrComplete)))
-highways2016Tr <- spTransform(highways2016, CRS(proj4string(gridFrComplete)))
-highways2020Tr <- spTransform(highways2020, CRS(proj4string(gridFrComplete)))
+highways2015Tr <- spTransform(highways2015, CRS(proj4string(gridFrComplete)))
+highways2018Tr <- spTransform(highways2018, CRS(proj4string(gridFrComplete)))
 listHighways <- list()
 listHighways[[1]] <- highways2012Tr
-listHighways[[2]] <- highways2016Tr
-listHighways[[3]] <- highways2020Tr
+listHighways[[2]] <- highways2015Tr
+listHighways[[3]] <- highways2018Tr
 
 # Cell centroids
 gridCentroid <- gCentroid(gridFrComplete, byid = TRUE)
@@ -247,9 +247,9 @@ for(i in 1:length(listHighways)){
   if(i == 1){
     colnames(distHgwCov)[i+1] <- "distHgw2012"
   } else if(i == 2){
-    colnames(distHgwCov)[i+1] <- "distHgw2016"
+    colnames(distHgwCov)[i+1] <- "distHgw2015"
   } else if(i == 3){
-    colnames(distHgwCov)[i+1] <- "distHgw2020"
+    colnames(distHgwCov)[i+1] <- "distHgw2018"
   }
 }
 
@@ -257,12 +257,15 @@ for(i in 1:length(listHighways)){
 ##############
 ## Road length 
 roads2012Tr <- crop(spTransform(roads2012, CRS(proj4string(gridFrComplete))), extent(gridFrComplete))
-roads2016Tr <- crop(spTransform(roads2016, CRS(proj4string(gridFrComplete))), extent(gridFrComplete))
-roads2020Tr <- crop(spTransform(roads2020, CRS(proj4string(gridFrComplete))), extent(gridFrComplete))
+# Doesn't work with sp. Need to use sf
+#roads2015Tr <- crop(spTransform(roads2015, CRS(proj4string(gridFrComplete))), extent(gridFrComplete))
+roads2015TrSF <- st_crop(st_as_sf(spTransform(roads2015, CRS(proj4string(gridFrComplete)))), st_as_sf(gridFrComplete))
+roads2015Tr <- sf::as_Spatial(roads2015TrSF)
+roads2018Tr <- crop(spTransform(roads2018, CRS(proj4string(gridFrComplete))), extent(gridFrComplete))
 listRoads <- list()
 listRoads[[1]] <- roads2012Tr
-listRoads[[2]] <- roads2016Tr
-listRoads[[3]] <- roads2020Tr
+listRoads[[2]] <- roads2015Tr
+listRoads[[3]] <- roads2018Tr
 
 # Total road length in each cell
 roadLengthCov <- data.frame(ID = gridFrComplete$ID)
@@ -298,9 +301,9 @@ for(i in 1:length(listRoads)){
   if(i == 1){
     colnames(roadLengthCov)[i+1] <- "roadLength2012"
   } else if(i == 2){
-    colnames(roadLengthCov)[i+1] <- "roadLength2016"
+    colnames(roadLengthCov)[i+1] <- "roadLength2015"
   } else if(i == 3){
-    colnames(roadLengthCov)[i+1] <- "roadLength2020"
+    colnames(roadLengthCov)[i+1] <- "roadLength2018"
   }
 }
 
@@ -440,9 +443,19 @@ gridPreys2 <- gridPreys %>%
   mutate(portReal = as.numeric((area / 1e+08) * realiz)) %>% 
   group_by(ID, year) %>%
   summarise(sumAttrib = sum(portAttrib, na.rm = TRUE), sumReal = sum(portReal, na.rm = TRUE))
+# Put back NA to cells which were all NA
+allNA <- gridPreys %>% 
+  group_by(ID, year) %>%
+  summarise(propNAattrib = sum(is.na(attrib))/length(attrib), propNAreal = sum(is.na(realiz))/length(realiz)) %>% 
+  st_drop_geometry() %>%
+  as_tibble() 
+gridPreys2NA <- gridPreys2 %>% 
+  left_join(allNA)
+gridPreys2NA[gridPreys2NA$propNAattrib == 1, "sumAttrib"] <- NA
+gridPreys2NA[gridPreys2NA$propNAreal == 1, "sumReal"] <- NA
 
 gridPreys3 <- gridFr_sf %>%
-  left_join(as.data.frame(gridPreys2)[,c("ID", "year", "sumAttrib", "sumReal")])
+  left_join(as.data.frame(gridPreys2NA)[,c("ID", "year", "sumAttrib", "sumReal")])
 gridPreys3 <- gridPreys3[!is.na(gridPreys3$year),]
 
 # Compute how much of the allowed number of deer are actually hunted
@@ -455,17 +468,20 @@ gridPreys3Fill <- gridPreys3 %>%
   mutate(sumReal = ifelse(is.na(sumReal), sumAttrib * mean(portHunted[,1], na.rm = TRUE), sumReal))
 
 # Convert each year data as a column and complete the cells to obtain the full grid
-gridPivot <- gridPreys3 %>% 
+gridPivot <- gridPreys3Fill %>% 
   as_tibble() %>% 
   select(ID, year, sumReal) %>% 
   pivot_wider(names_from = year, values_from = sumReal)
+# Remove the year 2015 et 2016, not enough data for the year
+gridPivot <- gridPivot %>% 
+  select(-"2015", -"2016")
 
 # Merge to the grid cells
 gridPreys4 <- gridFr_sf %>% 
   full_join(gridPivot)
 
 # Fill the NA cells with the mean of all 8 surrounding cells
-yearList <- c(1985, 1993, 1998, 2002, 2007, 2012, 2015, 2016, 2017, 2018, 2019, 2020)
+yearList <- c(1985, 1993, 1998, 2002, 2007, 2012, 2017, 2018, 2019, 2020)
 
 # Identify the 8 neighboring cells
 buffer <- gridPreys4 %>% 
@@ -514,6 +530,8 @@ for(y in yearList){
   }
   print(y)
 }
+
+colnames(preyCov)[-1] <- paste0("prey", colnames(preyCov)[-1])
 
 
 ###########################
