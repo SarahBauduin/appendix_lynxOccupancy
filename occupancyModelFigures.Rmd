@@ -1,0 +1,9 @@
+---
+title: "OccupancyModelFigures"
+output: html_document
+date: '2022-10-04'
+---
+
+```{r}
+source("occupancyModel.R")
+```

@@ -5,6 +5,9 @@ library(raster)
 library(lubridate)
 library(sf)
 library(jagsUI)
+library(MCMCvis)
+library(ggplot2)
+library(forcats)
 
 # Occupancy model
 
@@ -27,12 +30,12 @@ load("data/gridFrComplete.RData")
 gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
 
 # # Look at the covariates
-# gridFrCompleteCov <- gridFrComplete
-# gridFrCompleteCov@data <- cbind.data.frame(gridFrCompleteCov@data, cov, effort)
-# gridFrCompleteCovSf <- st_as_sf(gridFrCompleteCov)
-# for(i in 1:ncol(gridFrCompleteCovSf)){
-#   plot(gridFrCompleteCovSf[,i])
-# }
+gridFrCompleteCov <- gridFrComplete
+gridFrCompleteCov@data <- cbind.data.frame(gridFrCompleteCov@data, cov, effort)
+gridFrCompleteCovSf <- st_as_sf(gridFrCompleteCov)
+for(i in 1:ncol(gridFrCompleteCovSf)){
+  plot(gridFrCompleteCovSf[,i])
+}
 
 # Lynx presence data
 lynxData1 <- read.csv("data/lynx/lynx_INDallR.csv", header = TRUE, sep = ";")
@@ -80,13 +83,13 @@ for(year in yearStart:yearEnd){
   aprYearPlus1 <- lynxData_spdfTr[lynxData_spdfTr$date >= as.Date(paste(year + 1, "04", "01", sep = "-")) &
                                     lynxData_spdfTr$date < (as.Date(paste(year + 1, "04", "01", sep = "-")))%m+% months(1),]
   
-  plot(gridFrComplete, main = paste0("Winter ", year, "-", year + 1))
-  plot(novYear, add = TRUE, col = "red", pch = 16)
-  plot(decYear, add = TRUE, col = "blue", pch = 16)
-  plot(janYearPlus1, add = TRUE, col = "green", pch = 16)
-  plot(febYearPlus1, add = TRUE, col = "yellow", pch = 16)
-  plot(marYearPlus1, add = TRUE, col = "orange", pch = 16)
-  plot(aprYearPlus1, add = TRUE, col = "purple", pch = 16)
+  # plot(gridFrComplete, main = paste0("Winter ", year, "-", year + 1))
+  # plot(novYear, add = TRUE, col = "red", pch = 16)
+  # plot(decYear, add = TRUE, col = "blue", pch = 16)
+  # plot(janYearPlus1, add = TRUE, col = "green", pch = 16)
+  # plot(febYearPlus1, add = TRUE, col = "yellow", pch = 16)
+  # plot(marYearPlus1, add = TRUE, col = "orange", pch = 16)
+  # plot(aprYearPlus1, add = TRUE, col = "purple", pch = 16)
   
   # Which cells were occupied
   if(length(novYear) != 0){
@@ -136,12 +139,11 @@ effort <- effort[,(1993 - 1993 + 1):(1993 - 1993 + 1 + 2019 - 1993)]
 
 # Identify cells which were never sampled
 # Transform the effort in a binary variable
-samplEffort <- ifelse(effort > 0, 1, 0)
+binaryEffort <- ifelse(effort > 0, 1, 0)
 # Place NA in effort and in obsLynx for cells not sampled
-samplEffort[samplEffort == 0] <- NA
-for(i in 1:nrow(samplEffort)){
-  for(j in 1:ncol(samplEffort)){
-    if(is.na(samplEffort[i, j])){
+for(i in 1:nrow(binaryEffort)){
+  for(j in 1:ncol(binaryEffort)){
+    if(binaryEffort[i, j] == 0){
       obsLynx[i, 1:6, j] <- NA 
     } 
   }
@@ -152,7 +154,8 @@ noSampl <- apply(obsLynx, 1, function(x) all(is.na(x)))
 sum(noSampl)
 # Remove cells never samples
 covSampl <- cov[!noSampl,]
-samplEffortSampl <- samplEffort[!noSampl,]
+effortSampl <- effort[!noSampl,]
+binaryEffortSampl <- binaryEffort[!noSampl,]
 obsLynxSampl <- obsLynx[!noSampl,,]
 
 # Dataset characteristics
@@ -162,8 +165,7 @@ nYears <- dim(obsLynxSampl)[3]
 
 # Scaling the covariates
 covScale <- scale(covSampl) # scaling by column
-binaryEffort <- ifelse(samplEffortSampl > 0, 1, 0)
-effortScale <- scale(samplEffortSampl)
+effortScale <- scale(effortSampl)
 # Duplicate values in-between years for the missing years
 rep.col <- function(x, n){
   matrix(rep(x, each = n), ncol = n, byrow = TRUE)
@@ -238,13 +240,13 @@ dataFull <- list(nSites = nSites,
               agri23 = agri23Cov,
               agri24 = agri24Cov,
               distHighway = distHighwayCov,
-              roadLengthCov = roadLengthCov,
+              roadLength = roadLengthCov,
               hDens = covScale[, "hDensCov[, -1]"],
               tri = covScale[, "triCov[, -1]"],
               prey = preyCov,
               hfi = hfiCov,
-              binaryEffort = binaryEffort,
-              nSitesYear = apply(binaryEffort, 2, sum),
+              binaryEffort = binaryEffortSampl,
+              nSitesYear = apply(binaryEffortSampl, 2, sum),
               y = apply(obsLynxSampl, c(1, 3), sum))
 
 # Model
@@ -278,12 +280,12 @@ model
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * roadLengthCov[i, j] + 
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * roadLength[i, j] + 
         alpha[11] * hDens[i] + alpha[12] * tri[i] + alpha[13] * prey[i, j] + alpha[14] * hfi[i, j] +
         b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * effort[i, j]
-      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(- binaryEffort[i, j]))
+      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(-binaryEffort[i, j]))
       y[i, j] ~ dbin(p[i, j] * z[i, j], nVisits) # Likelihood
     }
   }
@@ -299,7 +301,7 @@ writeLines(model,"modelOcc.txt")
 # Initial value
 zst <- dataFull$y
 zst[zst > 0] <- 1
-init1 <- list(alpha = runif(10, -2, 2),
+init1 <- list(alpha = runif(14, -2, 2),
               beta = runif(2, -2, 2),
               z = zst,
               b = rep(0, nYears),
@@ -307,7 +309,7 @@ init1 <- list(alpha = runif(10, -2, 2),
               u = rep(0, nSites),
               sd.b = 1,
               sd.u = 1)
-init2 <- list(alpha = runif(10, -2, 2),
+init2 <- list(alpha = runif(14, -2, 2),
               beta = runif(2, -2, 2),
               z = zst,
               b = rep(0, nYears),
@@ -328,17 +330,118 @@ parameters <- c("psi.fs",
                 "z")
 
 # Run the model
-lynxSim <- jags(data = dataFull, 
-                inits = inits, 
-                parameters = parameters,
-                n.iter = 10000,
-                model.file = "ModelOcc.txt",
-                n.chains = 2,
-                n.burnin = 2500)
-save(lynxSim, file="outputs/lynxZ.RData")
+# lynxSim <- jags(data = dataFull, 
+#                 inits = inits, 
+#                 parameters = parameters,
+#                 n.iter = 10000,
+#                 model.file = "ModelOcc.txt",
+#                 n.chains = 2,
+#                 n.burnin = 2500)
+# save(lynxSim, file="outputs/lynxZ.RData")
+load("outputs/lynxZ.RData")
 
 # Summary results
 round(lynxSim$summary, 2)
+# Slope of the effects of the covariates on the occupancy probability (alpha) to see if the convergence is satisfied 
+MCMCtrace(lynxSim, params = 'alpha', ISB = TRUE, ind = TRUE, Rhat = TRUE, n.eff = TRUE, pdf = FALSE)
+# Time effects on the occupancy probability (b) to see if the convergence is satisfied 
+MCMCtrace(lynxSim, params = 'b', ISB = TRUE, ind = TRUE, Rhat = TRUE, n.eff = TRUE, pdf = FALSE)
+
+# Effect size:
+MCMCplot(object = lynxSim, 
+         params = 'alpha', 
+         rank = TRUE,
+         labels = c("forest", "connectForest", "shrub", "openLand", "agri21", "agri22", "agri23", "agri24",
+         "distHighway", "roadLength", "hDens", "tri", "prey", "hfi"))
+
+# Compare naive and estimated trend in occupancy
+samples <- rbind(lynxSim$samples[[1]], lynxSim$samples[[2]])
+# str(samples)
+# length(samples[,'psi.fs[1]'])
+# colnames(samples)
+names.psifs <- grep('psi.fs',colnames(samples))
+psi.fs <- samples[,names.psifs]
+# dim(psi.fs)
+estim.occ <- apply(psi.fs, 2, mean)
+naive.occ <- apply(apply(obsLynxSampl, c(1, 3), max), 2, sum, na.rm = TRUE) / apply(binaryEffort, 2, sum)
+df <- data.frame(years = rep(1:27, 2), 
+                 occ = c(rep("naive", 27), rep("estimated", 27)),
+                 value = c(naive.occ, estim.occ))
+df %>%
+  ggplot() + 
+  aes(x = years, y = value, color = occ) +
+  geom_line(lwd = 2) + 
+  labs(x = "year",
+       y = "value",
+       title = "Naive vs estimated occupancy",
+       color = "")
+
+# Map of occupancy latent states
+tmp <- grep('z', colnames(samples))
+map <- samples[,tmp] 
+dim(map) # nb sites x nb years
+
+# Function to compute the mode of a distribution
+estimate_mode <- function(x) {
+  d <- density(x)
+  d$x[which.max(d$y)]
+}
+# Compute mode of occupancy for each site
+index <- seq(1, ncol(map), by = 2125)
+occ_year <- NULL
+for (i in 1:length(index)){
+  tmp <- map[1:2125, index[i]:(index[i] + 2125 - 1)]
+  zz <- apply(tmp, 2, estimate_mode)
+  zz <- ifelse(zz > 0.5, 1, 0)
+  occ_year <- cbind(occ_year, zz)
+}
+
+colnames(occ_year) <- paste0("Year", 1993:2019)
+
+# Add the occupancy estimated to the grid
+gridFrSampled <- gridFrComplete[!noSampl, ]
+gridFrSampled@data$occ_year <- occ_year
+
+# Visualise occupancy maps
+plot_occ <- function(mydf, mycov, myname){
+  ggplot2::ggplot(data = {{ mydf }}) + 
+  ggplot2::geom_sf(colour = "grey50", fill = "white", lwd = 0.00000001) + 
+  ggplot2::geom_sf(lwd = 0.01, aes(fill = {{ mycov }})) + 
+  scale_fill_viridis_d(alpha = 0.5,
+                       labels = c("Not used", "Used"),
+                       name = "") + 
+  ggplot2::labs(title = {{ myname }},
+                x = "",
+                y = "")
+}
+
+gridSF <- gridFrSampled %>% st_as_sf()
+plot_occ(gridSF, as_factor(occ_year[,1]), "1993-1994")
+plot_occ(gridSF, as_factor(occ_year[,2]), "1994-1995")
+plot_occ(gridSF, as_factor(occ_year[,3]), "1995-1996")
+plot_occ(gridSF, as_factor(occ_year[,4]), "1996-1997")
+plot_occ(gridSF, as_factor(occ_year[,5]), "1997-1998")
+plot_occ(gridSF, as_factor(occ_year[,6]), "1998-1999")
+plot_occ(gridSF, as_factor(occ_year[,7]), "1999-2000")
+plot_occ(gridSF, as_factor(occ_year[,8]), "2000-2001")
+plot_occ(gridSF, as_factor(occ_year[,9]), "2001-2002")
+plot_occ(gridSF, as_factor(occ_year[,10]), "2002-2003")
+plot_occ(gridSF, as_factor(occ_year[,11]), "2003-2004")
+plot_occ(gridSF, as_factor(occ_year[,12]), "2004-2005")
+plot_occ(gridSF, as_factor(occ_year[,13]), "2005-2006")
+plot_occ(gridSF, as_factor(occ_year[,14]), "2006-2007")
+plot_occ(gridSF, as_factor(occ_year[,15]), "2007-2008")
+plot_occ(gridSF, as_factor(occ_year[,16]), "2008-2009")
+plot_occ(gridSF, as_factor(occ_year[,17]), "2009-2010")
+plot_occ(gridSF, as_factor(occ_year[,18]), "2010-2011")
+plot_occ(gridSF, as_factor(occ_year[,19]), "2011-2012")
+plot_occ(gridSF, as_factor(occ_year[,20]), "2012-2013")
+plot_occ(gridSF, as_factor(occ_year[,21]), "2013-2014")
+plot_occ(gridSF, as_factor(occ_year[,22]), "2014-2015")
+plot_occ(gridSF, as_factor(occ_year[,23]), "2015-2016")
+plot_occ(gridSF, as_factor(occ_year[,24]), "2016-2017")
+plot_occ(gridSF, as_factor(occ_year[,25]), "2017-2018")
+plot_occ(gridSF, as_factor(occ_year[,26]), "2018-2019")
 
 
 

@@ -20,19 +20,19 @@ model
   for(i in 1:2) {
     beta[i]  ~ dnorm(0, 1)
   }
-  for(i in 1:12) {
+  for(i in 1:14) {
     alpha[i] ~ dnorm(0, 1)
   }
   for(i in 1:nSites) {
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * hfi[i, j] + alpha[10] * prey[i, j] + 
-        alpha[11] * hDens[i] + alpha[12] * tri[i] +
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * roadLength[i, j] + 
+        alpha[11] * hDens[i] + alpha[12] * tri[i] + alpha[13] * prey[i, j] + alpha[14] * hfi[i, j] +
         b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * effort[i, j]
-      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(- binaryEffort[i, j]))
+      p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(-binaryEffort[i, j]))
       y[i, j] ~ dbin(p[i, j] * z[i, j], nVisits) # Likelihood
     }
   }
