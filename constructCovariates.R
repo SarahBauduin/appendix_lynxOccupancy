@@ -540,6 +540,9 @@ colnames(preyCov)[-1] <- paste0("prey", colnames(preyCov)[-1])
 # HFI data
 hfi_1993 <- raster("data/HFI/1993/wildareas-v3-1993-human-footprint.tif")
 hfi_2009 <- raster("data/HFI/2009/wildareas-v3-2009-human-footprint.tif")
+# 50 is the maximum value on land, then 128 is given for water areas
+hfi_1993[hfi_1993 == 128] <- NA
+hfi_2009[hfi_2009 == 128] <- NA
 
 
 ####################
@@ -551,8 +554,8 @@ hfiCells_1993 <- raster::extract(hfi_1993, gridFr_sf)
 hfiCells_2009 <- raster::extract(hfi_2009, gridFr_sf)
 
 hfiCov <- cbind.data.frame(ID = gridFrComplete@data$ID, 
-                           hfi_1993 = unlist(lapply(hfiCells_1993, mean)),
-                           hfi_2009 = unlist(lapply(hfiCells_2009, mean)))
+                           hfi_1993 = unlist(lapply(hfiCells_1993, function(x) mean(x, na.rm = TRUE))),
+                           hfi_2009 = unlist(lapply(hfiCells_2009, function(x) mean(x, na.rm = TRUE))))
 
 
 ##################
