@@ -541,8 +541,8 @@ colnames(preyCov)[-1] <- paste0("prey", colnames(preyCov)[-1])
 hfi_1993 <- raster("data/HFI/1993/wildareas-v3-1993-human-footprint.tif")
 hfi_2009 <- raster("data/HFI/2009/wildareas-v3-2009-human-footprint.tif")
 # 50 is the maximum value on land, then 128 is given for water areas
-hfi_1993[hfi_1993 == 128] <- NA
-hfi_2009[hfi_2009 == 128] <- NA
+hfi_1993[hfi_1993 == 128] <- 25 # gives a medium value
+hfi_2009[hfi_2009 == 128] <- 25
 
 
 ####################
