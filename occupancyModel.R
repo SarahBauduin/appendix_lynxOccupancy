@@ -336,14 +336,14 @@ parameters <- c("psi.fs",
                 "z")
 
 # Run the model
-lynxSim <- jags(data = dataFull,
-                inits = inits,
-                parameters = parameters,
-                n.iter = 20000,
-                model.file = "modelOcc.txt",
-                n.chains = 2,
-                n.burnin = 10000)
-save(lynxSim, file="outputs/lynxZ.RData")
+# lynxSim <- jags(data = dataFull,
+#                 inits = inits,
+#                 parameters = parameters,
+#                 n.iter = 20000,
+#                 model.file = "modelOcc.txt",
+#                 n.chains = 2,
+#                 n.burnin = 10000)
+# save(lynxSim, file="outputs/lynxZ.RData")
 load("outputs/lynxZ.RData")
 
 # Summary results
