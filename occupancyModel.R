@@ -64,7 +64,7 @@ lynxData_spdf <- SpatialPointsDataFrame(coords = allLynxData[,c("X", "Y")], data
                                          proj4string = CRS(as.character("+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")),
                                          match.ID = TRUE, bbox = NULL)
 lynxData_spdf$date <- as.Date(allLynxData$date, format = "%Y-%m-%d")
-lynxData_spdfTr <- spTransform(lynxData_spdf, gridFrComplete@proj4string)
+lynxData_spdfTr <- crop(spTransform(lynxData_spdf, gridFrComplete@proj4string), extent(c(720000, 1090000, 6260000, 6920000)))
 
 # Which cells are occupied during which year
 yearStart <- as.numeric(format(min(lynxData_spdfTr$date), "%Y"))
