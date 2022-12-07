@@ -4,6 +4,6 @@ output: html_document
 date: '2022-10-04'
 ---
 
-```{r}
+```{r, echo = FALSE, results = 'hide', fig.keep = 'all'}
 source("occupancyModel.R")
 ```
