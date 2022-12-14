@@ -88,8 +88,8 @@ colnames(forestCov) <- c("ID", "forest1990", "forest2000", "forest2006", "forest
 
 ######################
 ## Forest connectivity 
-# From "forested cells" (i.e., cells with more than 50% of forest cover),
-# the number of "forested cells" in a 10 km buffer
+# The number of "forested cells" (i.e., cells with more than 50% of forest cover),
+# in a 10 km buffer
 forest <- list()
 forest[[1]] <- st_as_sf(clc1990) %>%
   filter(CODE_90 %in% c("311", "312", "313"))
@@ -115,10 +115,9 @@ for(i in 1:length(forest)){
     summarise(area = sum(area)) %>% 
     mutate(forest = ifelse(as.numeric(area) >= 50000000, 1, 0))
   
-  # 10 km buffer around these cells
+  # 10 km buffer around all cells
   gridForest3 <- gridForest2 %>% 
-    filter(forest == 1) %>% 
-    st_buffer(dist = 10000) %>% 
+    st_buffer(dist = 9000) %>% 
     rename(IDBuffer = ID)
   
   # Forested cells in the buffers
