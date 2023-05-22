@@ -272,7 +272,6 @@ for(i in 1:length(listRoads)){
     lengthAllRoads <- gLength(roadsIn, byid = TRUE) # calculate the length of each type of road per cell ID
     lengthRoadsCellCut <- aggregate(lengthAllRoads, by = list(ID = roadsIn$ID), FUN = function(x)sum(x, na.rm = TRUE)) # and sum the length per cell ID
     lengthRoadsCells <- rbind.data.frame(lengthRoadsCells, lengthRoadsCellCut)
-    save(lengthRoadsCells, file = "outputs/lengthRoadsCellsTemp.RData")
     print(j)
   }
   
@@ -417,7 +416,6 @@ gridPreys <- st_intersection(gridFr_sf[cutCells[[1]],], communes_all)
 for(j in 2:length(cutCells)){
   gridPreysCut <- st_intersection(gridFr_sf[cutCells[[j]],], communes_all)
   gridPreys <- rbind(gridPreys, gridPreysCut)
-  save(gridPreys, file = "outputs/gridPreysTemp.RData")
   print(j)
 } 
 gridPreys$area <- st_area(gridPreys)
