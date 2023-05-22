@@ -16,6 +16,10 @@ library(janitor)
 load("data/gridFrComplete.RData")
 # Crop the grid to the study area extent (east of France)
 gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
+# Remove cells that are not completely in France
+load("data/franceShape.RData")
+gridOnlyFr <- intersect(gridFrComplete, franceShape)
+gridFrComplete <- gridOnlyFr[gridOnlyFr$area >= 1e+08, ]
 
 
 ##########################
@@ -212,45 +216,27 @@ save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov,
 ###############
 # Route500 data from 2012, 2015, and 2018
 roads2012 <- shapefile("data/route500/2012/TRONCON_ROUTE.shp")
-highways2012 <- roads2012[roads2012$VOCATION == "Type autoroutier", ]
 roads2015 <- shapefile("data/route500/2015/TRONCON_ROUTE.shp")
-highways2015 <- roads2015[roads2015$VOCATION == "Type autoroutier", ]
 roads2018 <- shapefile("data/route500/2018/TRONCON_ROUTE.shp")
-highways2018 <- roads2018[roads2018$VOCATION == "Type autoroutier", ]
+# Highways from 2014
+highways <- shapefile("data/highways/cropHighways.shp") 
+# not to the exact extent of the grid to calculate closest highway which may be outside of the grid extent
 
 
 #######################
 ## Distance to highways
-highways2012Tr <- spTransform(highways2012, CRS(proj4string(gridFrComplete)))
-highways2015Tr <- spTransform(highways2015, CRS(proj4string(gridFrComplete)))
-highways2018Tr <- spTransform(highways2018, CRS(proj4string(gridFrComplete)))
-listHighways <- list()
-listHighways[[1]] <- highways2012Tr
-listHighways[[2]] <- highways2015Tr
-listHighways[[3]] <- highways2018Tr
+highwaysTr <- spTransform(highways, CRS(proj4string(gridFrComplete)))
 
 # Cell centroids
 gridCentroid <- gCentroid(gridFrComplete, byid = TRUE)
 # Distance for each centroid
 distHgwCov <- data.frame(ID = gridFrComplete$ID)
-
-for(i in 1:length(listHighways)){
-  
-  distHgws <- rep(NA, length(gridFrComplete))
-  
-  for(j in 1:length(gridCentroid)){
-    distHgws[j] <- gDistance(gridCentroid[j], listHighways[[i]])
-  }
-  
-  distHgwCov <- cbind.data.frame(distHgwCov, as.data.frame(distHgws))
-  if(i == 1){
-    colnames(distHgwCov)[i+1] <- "distHgw2012"
-  } else if(i == 2){
-    colnames(distHgwCov)[i+1] <- "distHgw2015"
-  } else if(i == 3){
-    colnames(distHgwCov)[i+1] <- "distHgw2018"
-  }
+distHgws <- rep(NA, length(gridFrComplete))
+for(j in 1:length(gridCentroid)){
+  distHgws[j] <- gDistance(gridCentroid[j], highwaysTr)
 }
+  
+distHgwCov <- cbind.data.frame(distHgwCov, as.data.frame(distHgws))
 
 
 ##############
@@ -492,7 +478,6 @@ bufferCells <- st_intersection(buffer[cutCells[[1]],], gridPreys4)
 for(j in 2:length(cutCells)){
   bufferCellsCut <- st_intersection(buffer[cutCells[[j]],], gridPreys4)
   bufferCells <- rbind(bufferCells, bufferCellsCut)
-  save(bufferCells, file = "outputs/bufferCellsTemp.RData")
   print(j)
 } 
 
@@ -505,7 +490,6 @@ preyCov <- gridPreys4 %>%
 for(y in yearList){
   
   while(sum(is.na(preyCov[, as.character(y)])) != 0){
-      
     # Cells which are NA
     cellYearNAID <- preyCov %>% 
       select(ID, as.character(y)) %>% 
