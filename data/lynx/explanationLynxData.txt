@@ -1,7 +1,10 @@
-Lynx presence signs:
+Lynx presence signs from Réseau Loup-Lynx:
 lynx_INDallR (until 2021)
 Export_Requete_pour_export (after 2021)
 
-Lynx damage reports:
+Lynx damage reports from Réseau Loup-Lynx:
 Lynx_DOMLNE_1989-2018
 Lynx_DOMLNE_2019-2020
+
+Lynx presence signs from OCS:
+datalynx_ocs
