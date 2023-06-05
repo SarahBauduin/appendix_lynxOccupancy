@@ -7,4 +7,4 @@ Lynx_DOMLNE_1989-2018
 Lynx_DOMLNE_2019-2020
 
 Lynx presence signs from OCS:
-datalynx_ocs
+agentsIndicesOCS

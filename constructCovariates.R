@@ -21,7 +21,7 @@ load("data/franceShape.RData")
 gridOnlyFr <- raster::intersect(gridFrComplete, franceShape)
 gridOnlyFr$area <- gArea(gridOnlyFr, byid = TRUE)
 gridFrComplete <- gridOnlyFr[gridOnlyFr$area >= 1e+08, ]
-
+save(gridFrComplete, file = "data/gridFrCompleteCrop.RData")
 
 ##########################
 ## LANDSCAPE COVER DATA ##
