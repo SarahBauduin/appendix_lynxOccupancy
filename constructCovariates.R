@@ -18,7 +18,8 @@ load("data/gridFrComplete.RData")
 gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
 # Remove cells that are not completely in France
 load("data/franceShape.RData")
-gridOnlyFr <- intersect(gridFrComplete, franceShape)
+gridOnlyFr <- raster::intersect(gridFrComplete, franceShape)
+gridOnlyFr$area <- gArea(gridOnlyFr, byid = TRUE)
 gridFrComplete <- gridOnlyFr[gridOnlyFr$area >= 1e+08, ]
 
 
@@ -256,12 +257,12 @@ listRoads[[3]] <- roads2018Tr
 roadLengthCov <- data.frame(ID = gridFrComplete$ID)
 
 # Need to cut the grid into cell sequences otherwise the following functions fail with too many cells
-cutSeq <- seq(1, 2131, 100) 
+cutSeq <- seq(1, 1856, 100) 
 cutCells <- list()
 for(i in 1:(length(cutSeq) - 1)){
   cutCells[[i]] <- seq(cutSeq[i], cutSeq[i + 1] - 1, by = 1)
 }
-cutCells[[22]] <- 2101:2131
+cutCells[[19]] <- 1801:1856
 
 for(i in 1:length(listRoads)){
   
@@ -405,12 +406,12 @@ gridFr_sf <- st_as_sf(gridFrComplete) %>%
   st_transform(crs = st_crs(communes_all))
 
 # Need to cut the grid into cell sequences otherwise the following function fails with too many cells
-cutSeq <- seq(1, 2131, 50) 
+cutSeq <- seq(1, 1856, 50) 
 cutCells <- list()
 for(i in 1:(length(cutSeq) - 1)){
   cutCells[[i]] <- seq(cutSeq[i], cutSeq[i + 1] - 1, by = 1)
 }
-cutCells[[43]] <- 2101:2131
+cutCells[[38]] <- 1851:1856
 
 gridPreys <- st_intersection(gridFr_sf[cutCells[[1]],], communes_all)
 for(j in 2:length(cutCells)){
