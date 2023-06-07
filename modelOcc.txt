@@ -36,7 +36,7 @@ model
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * hDens[i] + alpha[11] * tri[i] + 
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * hDens[i] + alpha[11] * tri[i] + 
         alpha[12] * prey[i, j] + alpha[13] * hfi[i, j] + b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * roadLength[i, j] + v[i, j]

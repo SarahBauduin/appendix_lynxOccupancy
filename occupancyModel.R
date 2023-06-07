@@ -27,17 +27,15 @@ cov <- cbind.data.frame(forestCov, connectForCov[,-1], shrubCov[,-1],
 
 
 # Grid cell on which lynx presence data are identified
-load("data/gridFrComplete.RData")
-# Crop the grid to the study area extent (east of France)
-gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
+load("data/gridFrCompleteCrop.RData")
 
 # # Look at the covariates
 gridFrCompleteCov <- gridFrComplete
 gridFrCompleteCov@data <- cbind.data.frame(gridFrCompleteCov@data, cov, effort)
 gridFrCompleteCovSf <- st_as_sf(gridFrCompleteCov)
-for(i in 1:ncol(gridFrCompleteCovSf)){
-  plot(gridFrCompleteCovSf[,i])
-}
+# for(i in 1:ncol(gridFrCompleteCovSf)){
+#   plot(gridFrCompleteCovSf[,i])
+# }
 
 ###################### 
 # Lynx presence data #
@@ -47,13 +45,16 @@ lynxData2 <- read.csv("data/lynx/Export_Requete_pour_export.csv", header = TRUE,
 lynxData2 <- lynxData2[lynxData2$Fiabilité == "Retenu", ] # confirmed
 lynxData3 <- read.csv("data/lynx/Lynx_DOMLNE_1989-2018.csv", header = TRUE, sep = ";")
 lynxData4 <- read.csv("data/lynx/Lynx_DOMLNE_2019-2020.csv", header = TRUE, sep = ";")
+load("data/lynx/agentsIndicesOCS.RData")
+lynxData5 <- agentsIndicesOCS
 
 allLynxData <- cbind.data.frame(date = c(as.Date(lynxData1$Date.observation), 
                                          format(as.Date(lynxData2$Date, format = "%d/%m/%y"), "%Y-%m-%d"), 
                                          as.Date(lynxData3$DateAttaque), 
-                                         as.Date(lynxData4$Date.attaque)),
-                                X = c(lynxData1$X, lynxData2$x_l93, lynxData3$X, lynxData4$X),
-                                Y = c(lynxData1$Y, lynxData2$y_l93, lynxData3$Y, lynxData4$Y))
+                                         as.Date(lynxData4$Date.attaque),
+                                         as.Date(lynxData5$date)),
+                                X = c(lynxData1$X, lynxData2$x_l93, lynxData3$X, lynxData4$X, lynxData5$x),
+                                Y = c(lynxData1$Y, lynxData2$y_l93, lynxData3$Y, lynxData4$Y, lynxData5$y))
 
 allLynxData <- allLynxData[!is.na(allLynxData$date),]
 allLynxData <- allLynxData[!is.na(allLynxData$X),]
@@ -64,7 +65,7 @@ lynxData_spdf <- SpatialPointsDataFrame(coords = allLynxData[,c("X", "Y")], data
                                          proj4string = CRS(as.character("+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")),
                                          match.ID = TRUE, bbox = NULL)
 lynxData_spdf$date <- as.Date(allLynxData$date, format = "%Y-%m-%d")
-lynxData_spdfTr <- crop(spTransform(lynxData_spdf, gridFrComplete@proj4string), extent(c(720000, 1090000, 6260000, 6920000)))
+lynxData_spdfTr <- raster::intersect(spTransform(lynxData_spdf, gridFrComplete@proj4string), gridFrComplete)
 
 # Which cells are occupied during which year
 yearStart <- as.numeric(format(min(lynxData_spdfTr$date), "%Y"))
@@ -138,7 +139,7 @@ for(year in yearStart:yearEnd){
 # Lynx data are only valid until winter 2019-2020
 # We will restrict the effort data and lynx data from 1993-1994 to 2019-2020
 obsLynx <- obsLynx[,,(1993 - yearStart + 1):(1993 - yearStart + 1 + 2019 - 1993)]
-dim(obsLynx) # 2131 (n cells in the grid) x 6 months x 1993 to 2019
+dim(obsLynx) # 1856 (n cells in the grid) x 6 months x 1993 to 2019
 effort <- effort[,(1993 - 1993 + 1):(1993 - 1993 + 1 + 2019 - 1993)]
 
 # Identify cells which were never sampled
@@ -212,9 +213,6 @@ agri24S <- cbind(rep.col(covScale[, "agri24_1990"], 7), # from winter 93/94 to w
                    rep.col(covScale[, "agri24_2006"], 6), # from winter 06/07 to winter 11/12
                    rep.col(covScale[, "agri24_2012"], 6), # from winter 12/13 to winter 17/18
                    rep.col(covScale[, "agri24_2018"], 2)) # from winter 18/19 to winter 19/20
-distHighwayS <- cbind(rep.col(covScale[, "distHgw2012"], 22), # from winter 93/94 to winter 14/15
-                        rep.col(covScale[, "distHgw2015"], 3), # from winter 15/16 to winter 17/18
-                        rep.col(covScale[, "distHgw2018"], 2)) # from winter 18/19 to winter 19/20
 roadLengthS <- cbind(rep.col(covScale[, "roadLength2012"], 22), # from winter 93/94 to winter 14/15
                        rep.col(covScale[, "roadLength2015"], 3), # from winter 15/16 to winter 17/18
                        rep.col(covScale[, "roadLength2018"], 2)) # from winter 18/19 to winter 19/20
@@ -243,7 +241,7 @@ dataFull <- list(nSites = nSites,
               agri22 = agri22S,
               agri23 = agri23S,
               agri24 = agri24S,
-              distHighway = distHighwayS,
+              distHighway = covScale[, "distHgwCov[, -1]"],
               roadLength = roadLengthS,
               hDens = covScale[, "hDensCov[, -1]"],
               tri = covScale[, "triCov[, -1]"],
@@ -293,7 +291,7 @@ model
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i, j] + alpha[10] * hDens[i] + alpha[11] * tri[i] + 
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * hDens[i] + alpha[11] * tri[i] + 
         alpha[12] * prey[i, j] + alpha[13] * hfi[i, j] + b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * roadLength[i, j] + v[i, j]
@@ -396,7 +394,7 @@ occEstimate <- function(matrixAlpa, vectorBeta, lengthCov,
       matrixAlpa[i, 13] * covHfi + vectorBeta[i]
     
     mapsValues[, i] <- exp(logitVal) / (1 + exp(logitVal))
-    print(i)
+    #print(i)
   }
   
   return(mapsValues)
@@ -428,7 +426,7 @@ allA23S <- as.numeric((allA23 - mean(covSampl[, "agri23_2018"])) / sd(covSampl[,
 allA24 <- agri24Cov[, ncol(agri24Cov)]
 allA24S <- as.numeric((allA24 - mean(covSampl[, "agri24_2018"])) / sd(covSampl[, "agri24_2018"]))
 allDistH <- distHgwCov[, ncol(distHgwCov)]
-allDistHS <- as.numeric((allDistH - mean(covSampl[, "distHgw2018"])) / sd(covSampl[, "distHgw2018"]))
+allDistHS <- as.numeric((allDistH - mean(covSampl[, "distHgwCov[, -1]"])) / sd(covSampl[, "distHgwCov[, -1]"]))
 allDensH <- hDensCov[, ncol(hDensCov)]
 allDensHS <- as.numeric((allDensH - mean(covSampl[, "hDensCov[, -1]"])) / sd(covSampl[, "hDensCov[, -1]"]))
 allTri <- triCov[, ncol(triCov)]
@@ -444,9 +442,165 @@ gridFrCompleteCovAll@data <- data.frame(allForS = allForS, allConnFS = allConnFS
                                         allA23S = allA23S, allA24S = allA24S, allDistHS = allDistHS,
                                         allDensHS = allDensHS, allTriS = allTriS, allPreyS = allPreyS,
                                         allHfiS = allHfiS)
-for(i in 1:ncol(gridFrCompleteCovAll)){
-  plot(st_as_sf(gridFrCompleteCovAll[,i]))
-}
+# Plot each covariate with and without the point presence
+dataP <- st_as_sf(lynxData_spdfTr)
+covSF <- st_as_sf(gridFrCompleteCovAll)
+# Forest
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allForS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Forest")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allForS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Forest")
+print(plotWithPoints)
+# Forest connectivity
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allConnFS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Forest connectivity")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allConnFS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Forest connectivity")
+print(plotWithPoints)
+# Shrub
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allShrubS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Shrub")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allShrubS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Shrub")
+print(plotWithPoints)
+# Open land
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allOpenLS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Open land")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allOpenLS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Open land")
+print(plotWithPoints)
+# Agri 21
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA21S)) +
+  scale_fill_viridis_c() +
+  ggtitle("Agr21")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA21S)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Agri 21")
+print(plotWithPoints)
+# Agri 22
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA22S)) +
+  scale_fill_viridis_c() +
+  ggtitle("Agri 22")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA22S)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Agri 22")
+print(plotWithPoints)
+# Agri 23
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA23S)) +
+  scale_fill_viridis_c() +
+  ggtitle("Agri 23")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA23S)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Agri 23")
+print(plotWithPoints)
+# Agri 24
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA24S)) +
+  scale_fill_viridis_c() +
+  ggtitle("Agri 24")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allA24S)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Agri 24")
+print(plotWithPoints)
+# Distance to highways
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDistHS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Distance to highways")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDistHS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Distance to highways")
+print(plotWithPoints)
+# Human density
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDensHS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Human density")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDensHS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Human density")
+print(plotWithPoints)
+# TRI
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allTriS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Terrain ruggeness")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allTriS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Terrain ruggeness")
+print(plotWithPoints)
+# Prey
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allPreyS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Preys")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allPreyS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Preys")
+print(plotWithPoints)
+# HFI
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allHfiS)) +
+  scale_fill_viridis_c() +
+  ggtitle("Human footprint")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allHfiS)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Human footprint")
+print(plotWithPoints)
 
 allMapsValues <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = length(allForS), 
                              covFor = allForS, covConnF = allConnFS, covShrub = allShrubS, covOpenL = allOpenLS, 
@@ -462,6 +616,18 @@ mapPotentialOcc@data <- cbind.data.frame(meanOcc = meanOcc, lowCIocc = quantileO
 mapPotentialOcc <- st_as_sf(mapPotentialOcc)
 plot(mapPotentialOcc)
 
+# Plot predicted occupancy probability with data points
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc)) +
+  scale_fill_viridis_c() +
+  ggtitle("Mean occupancy predicted")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Mean occupancy predicted")
+print(plotWithPoints)
 
 # Create figures of mean occupancy as a function of each covariate while the other covariates are at their mean value
 
@@ -506,6 +672,7 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
      xlab = "Forest cover", ylab = "Occupancy probability")
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
 ## Prey
 # Define the range of value for the covariate
 covVal <- as.numeric(allPrey)
@@ -590,7 +757,7 @@ lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
 ## Distance to highways
 covVal <- as.numeric(allDistH)
-covValForScaling <- as.numeric(covSampl[, "distHgw2018"])
+covValForScaling <- as.numeric(covSampl[, "distHgwCov[, -1]"])
 rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
 covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
 covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
