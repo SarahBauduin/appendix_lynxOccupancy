@@ -168,3 +168,4 @@ outputs/bufferCells.cpg
 outputs/lynxMCP100_dist2_noPreys.RData
 outputs/lynxMCP100_dist_noPreys.RData
 outputs/preyTemp1km.RData
+data/lynx/agentsIndicesOCS.RData
