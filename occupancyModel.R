@@ -19,11 +19,14 @@ load("outputs/covariatesRoads.RData") # distHgwCov, roadLengthCov
 load("outputs/covariatesOthers.RData") # hDensCov, triCov, preyCov, hfiCov
 load("data/effort_NovDecJanFebMarApr_1993_2020.RData") # effort
 
+# Test quadratique term for distance to highways
+distHgwCov2 <- distHgwCov * distHgwCov
+
 cov <- cbind.data.frame(forestCov, connectForCov[,-1], shrubCov[,-1], 
                         openLandCov[,-1], agri21Cov[,-1], agri22Cov[,-1], 
-                        agri23Cov[,-1], agri24Cov[,-1], distHgwCov[,-1], 
-                        roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], 
-                        preyCov[,-1], hfiCov[,-1])
+                        agri23Cov[,-1], agri24Cov[,-1], distHgwCov[,-1], distHgwCov2[,-1], 
+                        roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], preyCov[,-1], 
+                        hfiCov[,-1])
 
 
 # Grid cell on which lynx presence data are identified
@@ -66,6 +69,36 @@ lynxData_spdf <- SpatialPointsDataFrame(coords = allLynxData[,c("X", "Y")], data
                                          match.ID = TRUE, bbox = NULL)
 lynxData_spdf$date <- as.Date(allLynxData$date, format = "%Y-%m-%d")
 lynxData_spdfTr <- raster::intersect(spTransform(lynxData_spdf, gridFrComplete@proj4string), gridFrComplete)
+
+
+## MCP
+library(adehabitatHR)
+library(dplyr)
+lynxMCP <- mcp(lynxData_spdfTr, percent = 100)
+#lynxMCP <- raster::buffer(SpatialPoints(lynxData_spdfTr@coords,proj4string = lynxData_spdfTr@proj4string), width = 50000)
+#lynxMCP <- LoCoH.k(lynxData_spdfTr)
+cellSelected <- st_intersection(gridFrCompleteCovSf, st_as_sf(lynxMCP))
+gridFrCompleteCovSf <- gridFrCompleteCovSf %>% filter(ID %in% cellSelected$ID)
+gridFrCompleteCov <- gridFrCompleteCov[gridFrCompleteCov$ID %in% cellSelected$ID,]
+effort <- st_drop_geometry(gridFrCompleteCovSf[,63:90])
+cov <- st_drop_geometry(gridFrCompleteCovSf[,c(2,4:62)])
+gridFrComplete <- gridFrComplete[gridFrComplete$ID %in% cellSelected$ID,]
+forestCov <- st_drop_geometry(gridFrCompleteCovSf[,4:8])
+connectForCov <- st_drop_geometry(gridFrCompleteCovSf[,9:13])
+shrubCov <- st_drop_geometry(gridFrCompleteCovSf[,14:18])
+openLandCov <- st_drop_geometry(gridFrCompleteCovSf[,19:23])
+agri21Cov <- st_drop_geometry(gridFrCompleteCovSf[,24:28])
+agri22Cov  <- st_drop_geometry(gridFrCompleteCovSf[,29:33])
+agri23Cov <- st_drop_geometry(gridFrCompleteCovSf[,34:38])
+agri24Cov <- st_drop_geometry(gridFrCompleteCovSf[,39:43])
+distHgwCov <- st_drop_geometry(gridFrCompleteCovSf[,44])
+distHgwCov2 <- st_drop_geometry(gridFrCompleteCovSf[,45])
+roadLengthCov <- st_drop_geometry(gridFrCompleteCovSf[,46:48])
+hDensCov <- st_drop_geometry(gridFrCompleteCovSf[,49])
+triCov <- st_drop_geometry(gridFrCompleteCovSf[,50])
+preyCov <- st_drop_geometry(gridFrCompleteCovSf[,51:60])
+hfiCov <- st_drop_geometry(gridFrCompleteCovSf[,61:62])
+####
 
 # Which cells are occupied during which year
 yearStart <- as.numeric(format(min(lynxData_spdfTr$date), "%Y"))
@@ -216,13 +249,13 @@ agri24S <- cbind(rep.col(covScale[, "agri24_1990"], 7), # from winter 93/94 to w
 roadLengthS <- cbind(rep.col(covScale[, "roadLength2012"], 22), # from winter 93/94 to winter 14/15
                        rep.col(covScale[, "roadLength2015"], 3), # from winter 15/16 to winter 17/18
                        rep.col(covScale[, "roadLength2018"], 2)) # from winter 18/19 to winter 19/20
-preyS <- cbind(rep.col(covScale[, "prey1993"], 5), # from winter 93/94 to winter 97/98
-                 rep.col(covScale[, "prey1998"], 4), # from winter 98/99 to winter 01/02
-                 rep.col(covScale[, "prey2002"], 5), # from winter 02/03 to winter 06/07
-                 rep.col(covScale[, "prey2007"], 5), # from winter 07/08 to winter 11/12
-                 rep.col(covScale[, "prey2012"], 5), # from winter 12/13 to winter 16/17
-                 rep.col(covScale[, "prey2017"], 2), # from winter 17/18 to winter 18/19
-                 rep.col(covScale[, "prey2019"], 1)) #  winter 19/20
+# preyS <- cbind(rep.col(covScale[, "prey1993"], 5), # from winter 93/94 to winter 97/98
+#                  rep.col(covScale[, "prey1998"], 4), # from winter 98/99 to winter 01/02
+#                  rep.col(covScale[, "prey2002"], 5), # from winter 02/03 to winter 06/07
+#                  rep.col(covScale[, "prey2007"], 5), # from winter 07/08 to winter 11/12
+#                  rep.col(covScale[, "prey2012"], 5), # from winter 12/13 to winter 16/17
+#                  rep.col(covScale[, "prey2017"], 2), # from winter 17/18 to winter 18/19
+#                  rep.col(covScale[, "prey2019"], 1)) #  winter 19/20
 hfiS <- cbind(rep.col(covScale[, "hfi_1993"], 16), # from winter 93/94 to winter 08/09
                 rep.col(covScale[, "hfi_2009"], 11)) # from winter 09/10 to winter 19/20
 
@@ -242,10 +275,11 @@ dataFull <- list(nSites = nSites,
               agri23 = agri23S,
               agri24 = agri24S,
               distHighway = covScale[, "distHgwCov[, -1]"],
+              distHighway2 = covScale[, "distHgwCov2[, -1]"],
               roadLength = roadLengthS,
               hDens = covScale[, "hDensCov[, -1]"],
               tri = covScale[, "triCov[, -1]"],
-              prey = preyS,
+              #prey = preyS,
               hfi = hfiS,
               binaryEffort = binaryEffortSampl,
               nSitesYear = apply(binaryEffortSampl, 2, sum),
@@ -291,8 +325,8 @@ model
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * hDens[i] + alpha[11] * tri[i] + 
-        alpha[12] * prey[i, j] + alpha[13] * hfi[i, j] + b[j] + u[i]
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * distHighway2[i] + alpha[11] * hDens[i] + 
+        alpha[12] * tri[i] +  alpha[13] * hfi[i, j] + b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * roadLength[i, j] + v[i, j]
       p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(-binaryEffort[i, j]))
@@ -346,30 +380,30 @@ parameters <- c("psi.fs",
                 "z")
 
 # Run the model
-# lynxSim <- jags(data = dataFull,
-#                 inits = inits,
-#                 parameters = parameters,
-#                 n.iter = 20000,
-#                 model.file = "modelOcc.txt",
-#                 n.chains = 2,
-#                 n.burnin = 10000)
-# save(lynxSim, file="outputs/lynxZ.RData")
-load("outputs/lynxZ.RData")
+lynxSim <- jags(data = dataFull,
+                inits = inits,
+                parameters = parameters,
+                n.iter = 20000,
+                model.file = "modelOcc.txt",
+                n.chains = 2,
+                n.burnin = 10000)
+save(lynxSim, file="outputs/lynxMCP100_dist2_noPreys.RData")
+load("outputs/lynxMCP100_dist2_noPreys.RData")
 
 # Summary results
 round(lynxSim$summary, 2)
 
 # Slope of the effects of the covariates on the occupancy probability (alpha) to see if the convergence is satisfied 
-MCMCtrace(lynxSim, params = 'alpha', ISB = TRUE, ind = TRUE, Rhat = TRUE, n.eff = TRUE, pdf = FALSE)
+MCMCtrace(lynxSim, params = 'alpha', ISB = TRUE, ind = TRUE, Rhat = TRUE, pdf = FALSE) #, n.eff = TRUE, pdf = FALSE)
 # Time effects on the occupancy probability (b) to see if the convergence is satisfied 
-MCMCtrace(lynxSim, params = 'b', ISB = TRUE, ind = TRUE, Rhat = TRUE, n.eff = TRUE, pdf = FALSE)
+MCMCtrace(lynxSim, params = 'b', ISB = TRUE, ind = TRUE, Rhat = TRUE, pdf = FALSE) #, n.eff = TRUE, pdf = FALSE)
 
 # Effect size:
 MCMCplot(object = lynxSim, 
          params = 'alpha', 
          rank = TRUE,
          labels = c("forest", "connectForest", "shrub", "openLand", "agri21", "agri22", "agri23", "agri24",
-         "distHighway", "hDens", "tri", "prey", "hfi"))
+                    "distHighway", "distHighway2", "hDens", "tri", "hfi"))
 
 
 #####################
@@ -381,7 +415,7 @@ MCMCplot(object = lynxSim,
 # Function to recreate occupancy probabilities
 occEstimate <- function(matrixAlpa, vectorBeta, lengthCov, 
                         covFor, covConnF, covShrub, covOpenL, covA21, covA22, covA23, 
-                        covA24, covDistH, covHDens, covTri, covPrey, covHfi){
+                        covA24, covDistH, covDistH2, covHDens, covTri, covHfi){
   
   mapsValues <- matrix(nrow = lengthCov, ncol = nrow(matrixAlpa))
   
@@ -390,7 +424,7 @@ occEstimate <- function(matrixAlpa, vectorBeta, lengthCov,
     logitVal <- matrixAlpa[i, 1] * covFor + matrixAlpa[i, 2] * covConnF + matrixAlpa[i, 3] * covShrub + 
       matrixAlpa[i, 4] * covOpenL + matrixAlpa[i, 5] * covA21 + matrixAlpa[i, 6] * covA22 + 
       matrixAlpa[i, 7] * covA23 + matrixAlpa[i, 8] * covA24 + matrixAlpa[i, 9] * covDistH + 
-      matrixAlpa[i, 10] * covHDens + matrixAlpa[i, 11] * covTri + matrixAlpa[i, 12] * covPrey + 
+      matrixAlpa[i, 10] * covDistH2 + matrixAlpa[i, 11] * covHDens + matrixAlpa[i, 12] * covTri + 
       matrixAlpa[i, 13] * covHfi + vectorBeta[i]
     
     mapsValues[, i] <- exp(logitVal) / (1 + exp(logitVal))
@@ -405,8 +439,20 @@ occEstimate <- function(matrixAlpa, vectorBeta, lengthCov,
 alphaEstim <- lynxSim$sims.list$alpha
 bEstim <- lynxSim$sims.list$b[, 27]
 
+# Plot the study area
+studAr <- ggplot() + 
+  geom_sf(data = st_geometry(gridFrCompleteCovSf)) + 
+  geom_sf(data = st_as_sf(lynxData_spdfTr), shape = 1) +
+  ggtitle("MCP 100")
+print(studAr)
+
 # Let's use the more recent values for the covariates
 # We need to do the same scaling as for the model
+load("data/gridFrCompleteCrop.RData")
+load("outputs/covariatesCover.RData") # forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, agri23Cov, agri24Cov
+load("outputs/covariatesRoads.RData") # distHgwCov, roadLengthCov
+load("outputs/covariatesOthers.RData") # hDensCov, triCov, preyCov, hfiCov
+load("data/effort_NovDecJanFebMarApr_1993_2020.RData") # effort
 # So we need the mean and sd on covariates where the cells never sampled were removed
 # But we compute occupancy probabilities over the whole landscape, even the cells that were never sampled
 allFor <- forestCov[, ncol(forestCov)]
@@ -427,24 +473,27 @@ allA24 <- agri24Cov[, ncol(agri24Cov)]
 allA24S <- as.numeric((allA24 - mean(covSampl[, "agri24_2018"])) / sd(covSampl[, "agri24_2018"]))
 allDistH <- distHgwCov[, ncol(distHgwCov)]
 allDistHS <- as.numeric((allDistH - mean(covSampl[, "distHgwCov[, -1]"])) / sd(covSampl[, "distHgwCov[, -1]"]))
+allDistH2 <- allDistH * allDistH
+allDistHS2 <- as.numeric((allDistH2 - mean(covSampl[, "distHgwCov2[, -1]"])) / sd(covSampl[, "distHgwCov2[, -1]"]))
 allDensH <- hDensCov[, ncol(hDensCov)]
 allDensHS <- as.numeric((allDensH - mean(covSampl[, "hDensCov[, -1]"])) / sd(covSampl[, "hDensCov[, -1]"]))
 allTri <- triCov[, ncol(triCov)]
 allTriS <- as.numeric((allTri - mean(covSampl[, "triCov[, -1]"])) / sd(covSampl[, "triCov[, -1]"]))
-allPrey <- preyCov[, "prey2020"]
-allPreyS <- as.numeric((allPrey - mean(covSampl[, "prey2020"])) / sd(covSampl[, "prey2020"]))
+# allPrey <- preyCov[, "prey2020"]
+# allPreyS <- as.numeric((allPrey - mean(covSampl[, "prey2020"])) / sd(covSampl[, "prey2020"]))
 allHfi <- hfiCov[, ncol(hfiCov)]
 allHfiS <- as.numeric((allHfi - mean(covSampl[, "hfi_2009"])) / sd(covSampl[, "hfi_2009"]))
 
-gridFrCompleteCovAll <- gridFrCompleteCov
-gridFrCompleteCovAll@data <- data.frame(allForS = allForS, allConnFS = allConnFS, allShrubS = allShrubS,
-                                        allOpenLS = allOpenLS, allA21S = allA21S, allA22S = allA22S,
-                                        allA23S = allA23S, allA24S = allA24S, allDistHS = allDistHS,
-                                        allDensHS = allDensHS, allTriS = allTriS, allPreyS = allPreyS,
-                                        allHfiS = allHfiS)
 # Plot each covariate with and without the point presence
 dataP <- st_as_sf(lynxData_spdfTr)
-covSF <- st_as_sf(gridFrCompleteCovAll)
+library(dplyr)
+covSF <- st_as_sf(gridFrComplete) %>% 
+  mutate(allForS = allForS, allConnFS = allConnFS, allShrubS = allShrubS,
+         allOpenLS = allOpenLS, allA21S = allA21S, allA22S = allA22S,
+         allA23S = allA23S, allA24S = allA24S, allDistHS = allDistHS, allDistHS2 = allDistHS2,
+         allDensHS = allDensHS, allTriS = allTriS, #allPreyS = allPreyS,
+         allHfiS = allHfiS)
+
 # Forest
 plotWithoutPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allForS)) +
@@ -553,6 +602,18 @@ plotWithPoints <- ggplot() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Distance to highways")
 print(plotWithPoints)
+# Distance to highways squared
+plotWithoutPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDistHS2)) +
+  scale_fill_viridis_c() +
+  ggtitle("Distance to highways2")
+print(plotWithoutPoints)
+plotWithPoints <- ggplot() + 
+  geom_sf(data = covSF, aes(fill = allDistHS2)) + 
+  scale_fill_viridis_c() +
+  geom_sf(data = dataP, shape = 1) +
+  ggtitle("Distance to highways2")
+print(plotWithPoints)
 # Human density
 plotWithoutPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allDensHS)) +
@@ -577,18 +638,18 @@ plotWithPoints <- ggplot() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Terrain ruggeness")
 print(plotWithPoints)
-# Prey
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allPreyS)) +
-  scale_fill_viridis_c() +
-  ggtitle("Preys")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allPreyS)) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
-  ggtitle("Preys")
-print(plotWithPoints)
+# # Prey
+# plotWithoutPoints <- ggplot() + 
+#   geom_sf(data = covSF, aes(fill = allPreyS)) +
+#   scale_fill_viridis_c() +
+#   ggtitle("Preys")
+# print(plotWithoutPoints)
+# plotWithPoints <- ggplot() + 
+#   geom_sf(data = covSF, aes(fill = allPreyS)) + 
+#   scale_fill_viridis_c() +
+#   geom_sf(data = dataP, shape = 1) +
+#   ggtitle("Preys")
+# print(plotWithPoints)
 # HFI
 plotWithoutPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allHfiS)) +
@@ -604,28 +665,27 @@ print(plotWithPoints)
 
 allMapsValues <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = length(allForS), 
                              covFor = allForS, covConnF = allConnFS, covShrub = allShrubS, covOpenL = allOpenLS, 
-                             covA21 = allA21S, covA22 = allA22S, covA23 = allA23S, covA24 = allA24S, covDistH = allDistHS, 
-                             covHDens = allDensHS, covTri = allTriS, covPrey = allPreyS, covHfi = allHfiS)
+                             covA21 = allA21S, covA22 = allA22S, covA23 = allA23S, covA24 = allA24S, covDistH = allDistHS, covDistH2 = allDistHS2, 
+                             covHDens = allDensHS, covTri = allTriS, #covPrey = allPreyS, 
+                             covHfi = allHfiS)
 
 # Compute the mean and quantiles for each cell over all iterations
 meanOcc <- rowMeans(allMapsValues, na.rm = TRUE)
 quantileOcc <- apply(allMapsValues, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 
-mapPotentialOcc <- gridFrCompleteCov
-mapPotentialOcc@data <- cbind.data.frame(meanOcc = meanOcc, lowCIocc = quantileOcc[1, ], upCIocc = quantileOcc[2, ])
-mapPotentialOcc <- st_as_sf(mapPotentialOcc)
-plot(mapPotentialOcc)
+mapPotentialOcc <- covSF %>% 
+  mutate(meanOcc = meanOcc, lowCIocc = quantileOcc[1, ], upCIocc = quantileOcc[2, ])
 
 # Plot predicted occupancy probability with data points
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc)) +
+  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Mean occupancy predicted")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc)) + 
+  geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4, color = alpha("black", 0.2)) +
   ggtitle("Mean occupancy predicted")
 print(plotWithPoints)
 
@@ -642,8 +702,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = covValS, 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = covValS, 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -663,8 +724,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = covValS, covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 # Compute the mean and CI occupancy probabilities
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
@@ -673,26 +735,26 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
-## Prey
-# Define the range of value for the covariate
-covVal <- as.numeric(allPrey)
-covValForScaling <- as.numeric(covSampl[, "prey2020"])
-rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
-covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
-covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
-# Estimate occupancy for this range of values for this covariate with all the others at their mean value
-valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
-                      covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
-                      covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = covValS, covHfi = mean(allHfiS))
-meanOcc <- rowMeans(valFor, na.rm = TRUE)
-quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
-# Compute the mean and CI occupancy probabilities
-plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
-     xlab = "Preys", ylab = "Occupancy probability")
-lines(x = covValTest, y = quantileOcc[1,], lty = 2)
-lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+# ## Prey
+# # Define the range of value for the covariate
+# covVal <- as.numeric(allPrey)
+# covValForScaling <- as.numeric(covSampl[, "prey2020"])
+# rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+# covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+# covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# # Estimate occupancy for this range of values for this covariate with all the others at their mean value
+# valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+#                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+#                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
+#                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+#                       covPrey = covValS, covHfi = mean(allHfiS))
+# meanOcc <- rowMeans(valFor, na.rm = TRUE)
+# quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# # Compute the mean and CI occupancy probabilities
+# plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+#      xlab = "Preys", ylab = "Occupancy probability")
+# lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+# lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
 ## Shrub
 # Define the range of value for the covariate
@@ -705,8 +767,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = covValS, covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -725,8 +788,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = covValS, covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -745,8 +809,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = covValS, covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -765,8 +830,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = covValS, covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = covValS, covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -774,6 +840,27 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
      xlab = "Distance to highways", ylab = "Occupancy probability")
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Distance to highways2
+covVal <- as.numeric(allDistH2)
+covValForScaling <- as.numeric(covSampl[, "distHgwCov2[, -1]"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
+                      covDistH = mean(allDistHS), covDistH2 = covValS, covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = sqrt(covValTest), y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Distance to highways", ylab = "Occupancy probability")
+lines(x = sqrt(covValTest), y = quantileOcc[1,], lty = 2)
+lines(x = sqrt(covValTest), y = quantileOcc[2,], lty = 2)
 
 ## Forest connectivity
 covVal <- as.numeric(allConnF)
@@ -785,8 +872,9 @@ covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = covValS, covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      covPrey = mean(allPreyS), covHfi = mean(allHfiS))
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      #covPrey = mean(allPreyS), 
+                      covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
