@@ -160,3 +160,11 @@ data/highways/roads.prj
 data/highways/roads.shp
 data/highways/roads.shx
 data/lynx/datalynx_ocs.csv
+outputs/bufferCells.shx
+outputs/bufferCells.shp
+outputs/bufferCells.prj
+outputs/bufferCells.dbf
+outputs/bufferCells.cpg
+outputs/lynxMCP100_dist2_noPreys.RData
+outputs/lynxMCP100_dist_noPreys.RData
+outputs/preyTemp1km.RData
