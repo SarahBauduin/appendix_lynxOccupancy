@@ -826,11 +826,13 @@ covValForScaling <- as.numeric(covSampl[, "distHgwCov[, -1]"])
 rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
 covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
 covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+covValForScaling2 <- as.numeric(covSampl[, "distHgwCov2[, -1]"])
+covValS2 <- ((covValTest * covValTest) - mean(covValForScaling2)) / sd(covValForScaling2)
 # Estimate occupancy for this range of values for this covariate with all the others at their mean value
 valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = covValS, covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      covDistH = covValS, covDistH2 = covValS2, covHDens = mean(allDensHS), covTri = mean(allTriS), 
                       #covPrey = mean(allPreyS), 
                       covHfi = mean(allHfiS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
@@ -840,27 +842,6 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
      xlab = "Distance to highways", ylab = "Occupancy probability")
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
-
-## Distance to highways2
-covVal <- as.numeric(allDistH2)
-covValForScaling <- as.numeric(covSampl[, "distHgwCov2[, -1]"])
-rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
-covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
-covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
-# Estimate occupancy for this range of values for this covariate with all the others at their mean value
-valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
-                      covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
-                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-                      covDistH = mean(allDistHS), covDistH2 = covValS, covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
-meanOcc <- rowMeans(valFor, na.rm = TRUE)
-quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
-# Compute the mean and CI occupancy probabilities
-plot(x = sqrt(covValTest), y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
-     xlab = "Distance to highways", ylab = "Occupancy probability")
-lines(x = sqrt(covValTest), y = quantileOcc[1,], lty = 2)
-lines(x = sqrt(covValTest), y = quantileOcc[2,], lty = 2)
 
 ## Forest connectivity
 covVal <- as.numeric(allConnF)
