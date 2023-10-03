@@ -20,16 +20,14 @@ library(terra)
 # gridFrComplete <- crop(gridFrComplete, extent(c(720000, 1090000, 6260000, 6920000)))
 # 
 # # Create a grid of 1km2
-# poly_sf <- st_geometry(st_as_sf(gridFrComplete))
-# grid1 <- st_make_grid(poly_sf, cellsize = 1000, square = TRUE)
-# grid1 <- st_intersection(grid1, st_sf(st_union(poly_sf)))
+# grid1 <- st_make_grid(st_as_sf(gridFrComplete), cellsize = 1000, square = TRUE)
 # # Remove cells that are not completely in France
 # load("data/franceShape.RData")
-# grid1 <- grid1 %>% 
-#   st_sf(.) %>% 
-#   mutate(ID = 1:nrow(.)) %>% 
+# grid1 <- grid1 %>%
+#   st_sf(.) %>%
+#   mutate(ID = 1:nrow(.)) %>%
 #   st_intersection(., st_as_sf(franceShape)) %>%
-#   mutate(area = st_area(.)) %>% 
+#   mutate(area = st_area(.)) %>%
 #   subset(as.numeric(area) == 1000000)
 # save(grid1, file = "data/grid1.RData")
 load("data/grid1.RData")

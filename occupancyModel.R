@@ -496,168 +496,168 @@ covSF <- st_as_sf(gridFrComplete) %>%
 
 # Forest
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allForS)) +
+  geom_sf(data = covSF, aes(fill = allForS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Forest")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allForS)) + 
+  geom_sf(data = covSF, aes(fill = allForS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Forest")
 print(plotWithPoints)
 # Forest connectivity
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allConnFS)) +
+  geom_sf(data = covSF, aes(fill = allConnFS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Forest connectivity")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allConnFS)) + 
+  geom_sf(data = covSF, aes(fill = allConnFS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Forest connectivity")
 print(plotWithPoints)
 # Shrub
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allShrubS)) +
+  geom_sf(data = covSF, aes(fill = allShrubS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Shrub")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allShrubS)) + 
+  geom_sf(data = covSF, aes(fill = allShrubS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Shrub")
 print(plotWithPoints)
 # Open land
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allOpenLS)) +
+  geom_sf(data = covSF, aes(fill = allOpenLS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Open land")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allOpenLS)) + 
+  geom_sf(data = covSF, aes(fill = allOpenLS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Open land")
 print(plotWithPoints)
 # Agri 21
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA21S)) +
+  geom_sf(data = covSF, aes(fill = allA21S), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Agr21")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA21S)) + 
+  geom_sf(data = covSF, aes(fill = allA21S), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Agri 21")
 print(plotWithPoints)
 # Agri 22
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA22S)) +
+  geom_sf(data = covSF, aes(fill = allA22S), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Agri 22")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA22S)) + 
+  geom_sf(data = covSF, aes(fill = allA22S), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Agri 22")
 print(plotWithPoints)
 # Agri 23
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA23S)) +
+  geom_sf(data = covSF, aes(fill = allA23S), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Agri 23")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA23S)) + 
+  geom_sf(data = covSF, aes(fill = allA23S), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Agri 23")
 print(plotWithPoints)
 # Agri 24
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA24S)) +
+  geom_sf(data = covSF, aes(fill = allA24S), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Agri 24")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA24S)) + 
+  geom_sf(data = covSF, aes(fill = allA24S), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Agri 24")
 print(plotWithPoints)
 # Distance to highways
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS)) +
+  geom_sf(data = covSF, aes(fill = allDistHS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Distance to highways")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS)) + 
+  geom_sf(data = covSF, aes(fill = allDistHS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Distance to highways")
 print(plotWithPoints)
 # Distance to highways squared
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS2)) +
+  geom_sf(data = covSF, aes(fill = allDistHS2), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Distance to highways2")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS2)) + 
+  geom_sf(data = covSF, aes(fill = allDistHS2), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Distance to highways2")
 print(plotWithPoints)
 # Human density
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDensHS)) +
+  geom_sf(data = covSF, aes(fill = allDensHS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Human density")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDensHS)) + 
+  geom_sf(data = covSF, aes(fill = allDensHS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Human density")
 print(plotWithPoints)
 # TRI
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allTriS)) +
+  geom_sf(data = covSF, aes(fill = allTriS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Terrain ruggeness")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allTriS)) + 
+  geom_sf(data = covSF, aes(fill = allTriS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Terrain ruggeness")
 print(plotWithPoints)
 # # Prey
 # plotWithoutPoints <- ggplot() + 
-#   geom_sf(data = covSF, aes(fill = allPreyS)) +
+#   geom_sf(data = covSF, aes(fill = allPreyS), color = NA) +
 #   scale_fill_viridis_c() +
 #   ggtitle("Preys")
 # print(plotWithoutPoints)
 # plotWithPoints <- ggplot() + 
-#   geom_sf(data = covSF, aes(fill = allPreyS)) + 
+#   geom_sf(data = covSF, aes(fill = allPreyS), color = NA) + 
 #   scale_fill_viridis_c() +
 #   geom_sf(data = dataP, shape = 1) +
 #   ggtitle("Preys")
 # print(plotWithPoints)
 # HFI
 plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allHfiS)) +
+  geom_sf(data = covSF, aes(fill = allHfiS), color = NA) +
   scale_fill_viridis_c() +
   ggtitle("Human footprint")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allHfiS)) + 
+  geom_sf(data = covSF, aes(fill = allHfiS), color = NA) + 
   scale_fill_viridis_c() +
   geom_sf(data = dataP, shape = 1) +
   ggtitle("Human footprint")
