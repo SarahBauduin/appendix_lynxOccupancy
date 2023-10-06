@@ -333,7 +333,7 @@ elevation <- terra::merge(elev1, elev2)
 #############
 ## Ruggedness
 # Compute TRI (terrain ruggedness index) on 1 km2 cells
-elevAggr <- terra::aggregate(elevation, fact = 40)
+elevAggr <- terra::aggregate(elevation, fact = 40, fun = "mean", na.rm = TRUE)
 elevTRI <- tri(elevAggr)
 
 # Compute the number of 1km2 "rugged cells" into 100km2 cells
