@@ -7,7 +7,9 @@ library(sf)
 library(jagsUI)
 library(MCMCvis)
 library(ggplot2)
-library(forcats)
+library(adehabitatHR)
+library(dplyr)
+#library(forcats)
 
 # Occupancy model
 
@@ -25,7 +27,7 @@ distHgwCov2 <- distHgwCov * distHgwCov
 cov <- cbind.data.frame(forestCov, connectForCov[,-1], shrubCov[,-1], 
                         openLandCov[,-1], agri21Cov[,-1], agri22Cov[,-1], 
                         agri23Cov[,-1], agri24Cov[,-1], distHgwCov[,-1], distHgwCov2[,-1], 
-                        roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], preyCov[,-1], 
+                        roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], #preyCov[,-1], 
                         hfiCov[,-1])
 
 
@@ -72,15 +74,13 @@ lynxData_spdfTr <- raster::intersect(spTransform(lynxData_spdf, gridFrComplete@p
 
 
 ## MCP
-library(adehabitatHR)
-library(dplyr)
 lynxMCP <- mcp(lynxData_spdfTr, percent = 100)
 #lynxMCP <- raster::buffer(SpatialPoints(lynxData_spdfTr@coords,proj4string = lynxData_spdfTr@proj4string), width = 50000)
 #lynxMCP <- LoCoH.k(lynxData_spdfTr)
 cellSelected <- st_intersection(gridFrCompleteCovSf, st_as_sf(lynxMCP))
 gridFrCompleteCovSf <- gridFrCompleteCovSf %>% filter(ID %in% cellSelected$ID)
 gridFrCompleteCov <- gridFrCompleteCov[gridFrCompleteCov$ID %in% cellSelected$ID,]
-effort <- st_drop_geometry(gridFrCompleteCovSf[,63:90])
+effort <- st_drop_geometry(gridFrCompleteCovSf[,53:80])
 cov <- st_drop_geometry(gridFrCompleteCovSf[,c(2,4:62)])
 gridFrComplete <- gridFrComplete[gridFrComplete$ID %in% cellSelected$ID,]
 forestCov <- st_drop_geometry(gridFrCompleteCovSf[,4:8])
@@ -96,8 +96,8 @@ distHgwCov2 <- st_drop_geometry(gridFrCompleteCovSf[,45])
 roadLengthCov <- st_drop_geometry(gridFrCompleteCovSf[,46:48])
 hDensCov <- st_drop_geometry(gridFrCompleteCovSf[,49])
 triCov <- st_drop_geometry(gridFrCompleteCovSf[,50])
-preyCov <- st_drop_geometry(gridFrCompleteCovSf[,51:60])
-hfiCov <- st_drop_geometry(gridFrCompleteCovSf[,61:62])
+#preyCov <- st_drop_geometry(gridFrCompleteCovSf[,51:60])
+hfiCov <- st_drop_geometry(gridFrCompleteCovSf[,51:52])
 ####
 
 # Which cells are occupied during which year
@@ -402,8 +402,8 @@ MCMCtrace(lynxSim, params = 'b', ISB = TRUE, ind = TRUE, Rhat = TRUE, pdf = FALS
 MCMCplot(object = lynxSim, 
          params = 'alpha', 
          rank = TRUE,
-         labels = c("forest", "connectForest", "shrub", "openLand", "agri21", "agri22", "agri23", "agri24",
-                    "distHighway", "distHighway2", "hDens", "tri", "hfi"))
+         labels = c("Forest", "Forest connectivity", "Shrub", "Open land", "Agri21", "Agri22", "Agri23", "Agri24",
+                    "Distance to highways", "Distance to highways 2", "Human density", "Ruggedness", "Human footprint"))
 
 
 #####################
@@ -442,7 +442,7 @@ bEstim <- lynxSim$sims.list$b[, 27]
 # Plot the study area
 studAr <- ggplot() + 
   geom_sf(data = st_geometry(gridFrCompleteCovSf)) + 
-  geom_sf(data = st_as_sf(lynxData_spdfTr), shape = 1) +
+  geom_sf(data = st_as_sf(lynxData_spdfTr), shape = 4, color = alpha("black", 0.5)) +
   ggtitle("MCP 100")
 print(studAr)
 
@@ -503,7 +503,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allForS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Forest")
 print(plotWithPoints)
 # Forest connectivity
@@ -515,7 +515,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allConnFS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Forest connectivity")
 print(plotWithPoints)
 # Shrub
@@ -527,7 +527,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allShrubS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Shrub")
 print(plotWithPoints)
 # Open land
@@ -539,7 +539,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allOpenLS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Open land")
 print(plotWithPoints)
 # Agri 21
@@ -551,7 +551,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allA21S), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Agri 21")
 print(plotWithPoints)
 # Agri 22
@@ -563,7 +563,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allA22S), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Agri 22")
 print(plotWithPoints)
 # Agri 23
@@ -575,7 +575,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allA23S), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Agri 23")
 print(plotWithPoints)
 # Agri 24
@@ -587,7 +587,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allA24S), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Agri 24")
 print(plotWithPoints)
 # Distance to highways
@@ -599,7 +599,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allDistHS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Distance to highways")
 print(plotWithPoints)
 # Distance to highways squared
@@ -611,7 +611,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allDistHS2), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Distance to highways2")
 print(plotWithPoints)
 # Human density
@@ -623,7 +623,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allDensHS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Human density")
 print(plotWithPoints)
 # TRI
@@ -635,7 +635,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allTriS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Terrain ruggeness")
 print(plotWithPoints)
 # # Prey
@@ -647,7 +647,7 @@ print(plotWithPoints)
 # plotWithPoints <- ggplot() + 
 #   geom_sf(data = covSF, aes(fill = allPreyS), color = NA) + 
 #   scale_fill_viridis_c() +
-#   geom_sf(data = dataP, shape = 1) +
+#   geom_sf(data = dataP, shape = 4) +
 #   ggtitle("Preys")
 # print(plotWithPoints)
 # HFI
@@ -659,7 +659,7 @@ print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = covSF, aes(fill = allHfiS), color = NA) + 
   scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 1) +
+  geom_sf(data = dataP, shape = 4) +
   ggtitle("Human footprint")
 print(plotWithPoints)
 
@@ -679,14 +679,14 @@ mapPotentialOcc <- covSF %>%
 # Plot predicted occupancy probability with data points
 plotWithoutPoints <- ggplot() + 
   geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Mean occupancy predicted")
+  scale_fill_viridis_c(name = "Occupancy prob.") #+
+  #ggtitle("Mean occupancy predicted")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4, color = alpha("black", 0.2)) +
-  ggtitle("Mean occupancy predicted")
+  scale_fill_viridis_c(name = "Occupancy prob.") +
+  geom_sf(data = dataP, shape = 4, color = alpha("black", 0.2)) #+
+  #ggtitle("Mean occupancy predicted")
 print(plotWithPoints)
 
 # Create figures of mean occupancy as a function of each covariate while the other covariates are at their mean value
