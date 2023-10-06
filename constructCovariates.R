@@ -339,7 +339,7 @@ elevTRI <- tri(elevAggr)
 # Compute the number of 1km2 "rugged cells" into 100km2 cells
 elevTRI[elevTRI < 162] <- 0 # 162 = "intermediately rugged surface"
 elevTRI[elevTRI >= 162] <- 0.01
-elevTRI_100km2 <- aggregate(elevTRI, fact = 10, fun = sum)
+elevTRI_100km2 <- aggregate(elevTRI, fact = 10, fun = sum, na.rm = TRUE)
 triCells <- elevTRI_100km2 %>% 
   terra::extract(., st_centroid(gridFrCompleteTr))
 triCov <- cbind.data.frame(ID = gridFrCompleteTr$ID, tri = triCells[ ,2])
