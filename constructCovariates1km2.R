@@ -4,13 +4,13 @@ setwd("C:/Users/sarah.bauduin/Documents/GitHub/appendix_lynxOccupancy/")
 library(raster)
 library(sf)
 library(dplyr)
-library(rgeos)
-library(spatialEco)
-library(geojsonio)
-library(stringr)
-library(tidyr)
-library(janitor)
 library(terra)
+library(spatialEco)
+# library(rgeos)
+# library(geojsonio)
+# library(stringr)
+# library(tidyr)
+# library(janitor)
 
 # Covariates to run the lynx occupancy model
 
@@ -71,7 +71,7 @@ extractPropCLC <- function(codesCLC){ # codesCLC as a vector of characters
       mutate(areaInter = st_area(.)) %>%
       group_by(ID) %>%
       summarise(areaCoverCell = sum(areaInter)) %>%
-      mutate(propCoverYear = areaCoverCell / 1e+08) %>%
+      mutate(propCoverYear = areaCoverCell / 1e+06) %>%
       as_tibble() %>%
       dplyr::select(ID, propCoverYear)
     
@@ -126,7 +126,7 @@ for(i in 1:length(forest)){
   gridForest2 <- gridForest %>% 
     group_by(ID) %>%
     summarise(area = sum(area)) %>% 
-    mutate(forest = ifelse(as.numeric(area) >= 50000000, 1, 0))
+    mutate(forest = ifelse(as.numeric(area) >= 500000, 1, 0))
   
   # 10 km buffer around all cells
   gridForest3 <- gridForest2 %>% 
@@ -299,7 +299,7 @@ gridFr_sf <- grid1 %>%
 
 ################
 ## Human density
-# Compute the mean human density (1km2) into the 10km2 cells
+# Compute the mean human density in 1km2
 humanDens <- gridFr_sf %>% 
   st_join(human_sf) %>% 
   group_by(ID) %>%
@@ -363,10 +363,10 @@ elevation <- terra::merge(elev1, elev2)
 #############
 ## Ruggedness
 # Compute TRI (terrain ruggedness index) on 1km2 cells
-elevAggr <- terra::aggregate(elevation, fact = 40)
+elevAggr <- terra::aggregate(elevation, fact = 40, fun = "mean", na.rm = TRUE)
 elevTRI <- tri(elevAggr)
 
-# Compute the number of 1km2 "rugged cells" into 1 km2 cells
+# Define "rugged cells"
 elevTRI[elevTRI < 162] <- 0 # 162 = "intermediately rugged surface"
 elevTRI[elevTRI >= 162] <- 1
 triCells <- elevTRI %>% 
@@ -580,11 +580,13 @@ hfi_2009[hfi_2009 == 128] <- 25
 
 ####################
 ## Human disturbance 
-gridFr_sf <- st_as_sf(grid1) %>%
+gridFr_sf <- grid1 %>%
   st_transform(crs = crs(hfi_1993))
-# Mean HFI per grid cells
-hfiCells_1993 <- terra::extract(hfi_1993, gridFr_sf, fun = mean)
-hfiCells_2009 <- terra::extract(hfi_2009, gridFr_sf, fun = mean)
+# HFI per grid cells
+hfiCells_1993 <- hfi_1993 %>% 
+  terra::extract(., st_centroid(gridFr_sf))
+hfiCells_2009 <- hfi_2009 %>% 
+  terra::extract(., st_centroid(gridFr_sf))
 
 hfiCov <- cbind.data.frame(ID = grid1$ID, 
                            hfi_1993 = hfiCells_1993[, 2],
