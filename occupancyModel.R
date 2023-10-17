@@ -9,6 +9,8 @@ library(MCMCvis)
 library(ggplot2)
 library(adehabitatHR)
 library(dplyr)
+library(cowplot)
+library(ggspatial)
 #library(forcats)
 
 # Occupancy model
@@ -440,11 +442,34 @@ alphaEstim <- lynxSim$sims.list$alpha
 bEstim <- lynxSim$sims.list$b[, 27]
 
 # Plot the study area
-studAr <- ggplot() + 
-  geom_sf(data = st_geometry(gridFrCompleteCovSf)) + 
+load("data/franceShape.RData")
+ggdraw(ggplot() + 
+  geom_sf(data = st_geometry(gridFrCompleteCovSf), fill = "white") + 
   geom_sf(data = st_as_sf(lynxData_spdfTr), shape = 4, color = alpha("black", 0.5)) +
-  ggtitle("MCP 100")
-print(studAr)
+  #ggtitle("MCP 100") +
+  annotation_scale(location = "tl", width_hint = 0.5,
+                   pad_x = unit(0, "cm"), pad_y = unit(1, "cm")) +
+  annotation_north_arrow(location = "tl", which_north = "true", 
+                         height = unit(1, "cm"), width = unit(1, "cm"),
+                         pad_x = unit(0, "cm"), pad_y = unit(2, "cm"),
+                         style = north_arrow_fancy_orienteering) +
+  theme_void()) + 
+  draw_plot(
+    {
+      ggplot() +
+        geom_sf(data = st_geometry(st_as_sf(franceShape)), fill = "white") +
+        geom_sf(data = st_geometry(st_union(gridFrCompleteCovSf)), fill = "gray80", color = "gray80", lwd = 1) +
+        geom_sf(data = st_geometry(st_as_sf(franceShape)), fill = NA) +
+        theme_void()
+    },
+    # The distance along a (0,1) x-axis to draw the left edge of the plot
+    x = 0.05, 
+    # The distance along a (0,1) y-axis to draw the bottom edge of the plot
+    y = 0,
+    # The width and height of the plot expressed as proportion of the entire ggdraw object
+    width = 0.31, 
+    height = 0.31
+  )
 
 # Let's use the more recent values for the covariates
 # We need to do the same scaling as for the model
