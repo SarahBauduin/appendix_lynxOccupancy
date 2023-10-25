@@ -123,17 +123,24 @@ for(i in 1:length(forest)){
     summarise(area = sum(area)) %>% 
     mutate(forest = ifelse(as.numeric(area) >= 50000000, 1, 0))
   
-  # 10 km buffer around all cells
+  # 9 km buffer around all cells
   gridForest3 <- gridForest2 %>% 
     st_buffer(dist = 9000) %>% 
     rename(IDBuffer = ID)
   
+  # How many in buffers
+  cellsInBuffer <- gridForest3 %>% 
+    st_intersection(gridFr_sf) %>% 
+    group_by(IDBuffer) %>%
+    summarise(nCells = n())
+
   # Forested cells in the buffers
   gridForest4 <- gridForest2 %>% 
-    filter(forest == 1) %>%
     st_intersection(gridForest3) %>% 
     group_by(IDBuffer) %>% 
-    summarise(sumForest = sum(forest))
+    summarise(sumForest1 = sum(forest))
+  gridForest4 <- gridForest4 %>% 
+    mutate(sumForest = sumForest1 / cellsInBuffer$nCells)
   
   gridForest5 <- gridFr_sf %>% 
     left_join(as.data.frame(gridForest4)[,c("IDBuffer", "sumForest")], by = c("ID" = "IDBuffer"))
