@@ -1,0 +1,9 @@
+Data downloaded from:
+https://www.ofb.gouv.fr/les-especes-chassables
+"Ressources", "Ongulés sauvages : tableaux de chasse et bilan des prélèvements", "Tableaux de chasse départementaux 1973-2021"
+Downloaded on 2023/10/25
+
+For the french departments:
+https://www.data.gouv.fr/fr/datasets/carte-des-departements-2-1/
+File updated in December 2019
+Downloaded on 2023/10/25
