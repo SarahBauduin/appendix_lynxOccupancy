@@ -371,7 +371,7 @@ humanDens <- st_intersection(gridFr_sf , human_sf) %>%
   group_by(ID) %>%
   summarise(humanDens1km2 = mean(Ind, na.rm = TRUE)) %>%
   as_tibble() %>%
-  select(ID, humanDens1km2)
+  dplyr::select(ID, humanDens1km2)
 # Fill with 0 the missing data
 hDensCov <- data.frame(ID = gridFrComplete$ID)
 hDensCov <- merge(hDensCov, as.data.frame(humanDens), all = TRUE)
@@ -394,7 +394,7 @@ elevation <- terra::merge(elev1, elev2)
 elevMean <- elevation %>% 
   terra::extract(gridFrCompleteTr) %>% 
   group_by(ID) %>% 
-  summarise(meanElev = mean(Band_1), sdElev = sd(Band_1))
+  summarise(meanElev = mean(Band_1, na.rm = TRUE), sdElev = sd(Band_1, na.rm = TRUE))
 elevCov <- as.data.frame(elevMean)
 
 
@@ -450,7 +450,7 @@ preyDensFun <- function(dataUngulates, nameColYear){
     mutate(preyDensInter = preyDens * (areaInter / area.1)) %>% # ratio of the cell
     group_by(ID) %>% 
     summarise(preyDensMean = sum(preyDensInter)) %>% 
-    select(ID, preyDensMean) %>% 
+    dplyr::select(ID, preyDensMean) %>% 
     st_drop_geometry() %>% 
     as.data.frame()
   # Fill with 0 the missing data
@@ -512,32 +512,9 @@ hfiCov <- cbind.data.frame(ID = gridFrComplete$ID,
                            hfi_2009 = hfiCells_2009[, 2])
 
 
-############
-## STRAVA ##
-############
-# Strava
-strava <- rast("data/strava/heatmap_strava_20220414_100_all.tiff")
-# 4 layers
-# layer 1 = all
-# layer 2 = run
-# layer 3 = ride
-# layer 4 = winter
-gridFrCompleteTr <- gridFrComplete %>%
-  st_transform(crs = st_crs(strava))
-stravaMean <- strava %>% 
-  terra::extract(gridFrCompleteTr) %>% 
-  mutate(strava3cat = heatmap_strava_20220414_100_all_2 + heatmap_strava_20220414_100_all_3 + 
-           heatmap_strava_20220414_100_all_4) %>% 
-  group_by(ID) %>% 
-  summarise(meanStravaAll = mean(heatmap_strava_20220414_100_all_1), meanStrava3cat = mean(strava3cat),
-            meanStravaRun = mean(heatmap_strava_20220414_100_all_2), meanStravaRide = mean(heatmap_strava_20220414_100_all_3),
-            meanStravaWinter = mean(heatmap_strava_20220414_100_all_4))
-stravaCov <- as.data.frame(stravaMean)
-
-
 ##################
 ## Save covariates
-save(hDensCov, elevCov, triCov, chaCov, deerCov, hfiCov, stravaCov,
+save(hDensCov, elevCov, triCov, chaCov, deerCov, hfiCov,
      file = "outputs/covariatesOthers.RData")
 
 ########################################################################
