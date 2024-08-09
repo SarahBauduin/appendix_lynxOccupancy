@@ -11,6 +11,8 @@ library(adehabitatHR)
 library(dplyr)
 library(cowplot)
 library(ggspatial)
+library(Hmisc)
+library(corrplot)
 #library(forcats)
 
 # Occupancy model
@@ -19,8 +21,8 @@ library(ggspatial)
 # Load covariates #
 ###################
 load("outputs/covariatesCover.RData") # forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, agri23Cov, agri24Cov
-load("outputs/covariatesRoads.RData") # distHgwCov, roadLengthCov
-load("outputs/covariatesOthers.RData") # hDensCov, triCov, preyCov, hfiCov
+load("outputs/covariatesRoads.RData") # distHgwCov, roadLengthCov, pathLengthCov
+load("outputs/covariatesOthers.RData") # hDensCov, elevCov, triCov, chaCov, deerCov, hfiCov, stravaCov
 load("data/effort_NovDecJanFebMarApr_1993_2020.RData") # effort
 
 # Test quadratique term for distance to highways
@@ -29,9 +31,32 @@ distHgwCov2 <- distHgwCov * distHgwCov
 cov <- cbind.data.frame(forestCov, connectForCov[,-1], shrubCov[,-1], 
                         openLandCov[,-1], agri21Cov[,-1], agri22Cov[,-1], 
                         agri23Cov[,-1], agri24Cov[,-1], distHgwCov[,-1], distHgwCov2[,-1], 
-                        roadLengthCov[,-1], hDensCov[,-1], triCov[,-1], #preyCov[,-1], 
-                        hfiCov[,-1])
+                        roadLengthCov[,-1], pathLengthCov[,-1], hDensCov[,-1], 
+                        elevCov[,-1], triCov[,-1], chaCov[,-1], deerCov[,-1], hfiCov[,-1], stravaCov[,-1])
 
+# Look at covariate correlation
+corrCov <- rcorr(as.matrix(cov[,c(6, 11, 16, 21, 26, 31, 36, 41, 42, 46, 49, 50, 
+                                  51, 52, 53, 61, 69, 71, 72:76)]))
+# Plot of correlation
+corrplot(corrCov$r, type = "upper", order = "hclust", 
+         p.mat = corrCov$p, sig.level = 0.05, insig = "blank")
+# ++++++++++++++++++++++++++++
+# flattenCorrMatrix
+# ++++++++++++++++++++++++++++
+# cormat : matrix of the correlation coefficients
+# pmat : matrix of the correlation p-values
+flattenCorrMatrix <- function(cormat, pmat) {
+  ut <- upper.tri(cormat)
+  data.frame(
+    row = rownames(cormat)[row(cormat)[ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor  =(cormat)[ut],
+    p = pmat[ut]
+  )
+}
+# Significant correlation
+corrCovMat <- flattenCorrMatrix(corrCov$r, corrCov$P)
+corrCovMat[abs(corrCovMat$cor) > 0.8 & corrCovMat$p < 0.05,]
 
 # Grid cell on which lynx presence data are identified
 load("data/gridFrCompleteCrop.RData")
@@ -82,8 +107,8 @@ lynxMCP <- mcp(lynxData_spdfTr, percent = 100)
 cellSelected <- st_intersection(gridFrCompleteCovSf, st_as_sf(lynxMCP))
 gridFrCompleteCovSf <- gridFrCompleteCovSf %>% filter(ID %in% cellSelected$ID)
 gridFrCompleteCov <- gridFrCompleteCov[gridFrCompleteCov$ID %in% cellSelected$ID,]
-effort <- st_drop_geometry(gridFrCompleteCovSf[,53:80])
-cov <- st_drop_geometry(gridFrCompleteCovSf[,c(2,4:62)])
+effort <- st_drop_geometry(gridFrCompleteCovSf[,79:106])
+cov <- st_drop_geometry(gridFrCompleteCovSf[,c(2,4:78)])
 gridFrComplete <- gridFrComplete[gridFrComplete$ID %in% cellSelected$ID,]
 forestCov <- st_drop_geometry(gridFrCompleteCovSf[,4:8])
 connectForCov <- st_drop_geometry(gridFrCompleteCovSf[,9:13])
@@ -96,10 +121,14 @@ agri24Cov <- st_drop_geometry(gridFrCompleteCovSf[,39:43])
 distHgwCov <- st_drop_geometry(gridFrCompleteCovSf[,44])
 distHgwCov2 <- st_drop_geometry(gridFrCompleteCovSf[,45])
 roadLengthCov <- st_drop_geometry(gridFrCompleteCovSf[,46:48])
-hDensCov <- st_drop_geometry(gridFrCompleteCovSf[,49])
-triCov <- st_drop_geometry(gridFrCompleteCovSf[,50])
-#preyCov <- st_drop_geometry(gridFrCompleteCovSf[,51:60])
-hfiCov <- st_drop_geometry(gridFrCompleteCovSf[,51:52])
+pathLengthCov <- st_drop_geometry(gridFrCompleteCovSf[,49:51])
+hDensCov <- st_drop_geometry(gridFrCompleteCovSf[,52])
+elevCov <- st_drop_geometry(gridFrCompleteCovSf[,53:54])
+triCov <- st_drop_geometry(gridFrCompleteCovSf[,55])
+chaCov <- st_drop_geometry(gridFrCompleteCovSf[,56:63])
+deerCov <- st_drop_geometry(gridFrCompleteCovSf[,64:71])
+hfiCov <- st_drop_geometry(gridFrCompleteCovSf[,72:73])
+stravaCov <- st_drop_geometry(gridFrCompleteCovSf[,74:78])
 ####
 
 # Which cells are occupied during which year
@@ -249,15 +278,26 @@ agri24S <- cbind(rep.col(covScale[, "agri24_1990"], 7), # from winter 93/94 to w
                    rep.col(covScale[, "agri24_2012"], 6), # from winter 12/13 to winter 17/18
                    rep.col(covScale[, "agri24_2018"], 2)) # from winter 18/19 to winter 19/20
 roadLengthS <- cbind(rep.col(covScale[, "roadLength2012"], 22), # from winter 93/94 to winter 14/15
-                       rep.col(covScale[, "roadLength2015"], 3), # from winter 15/16 to winter 17/18
-                       rep.col(covScale[, "roadLength2018"], 2)) # from winter 18/19 to winter 19/20
-# preyS <- cbind(rep.col(covScale[, "prey1993"], 5), # from winter 93/94 to winter 97/98
-#                  rep.col(covScale[, "prey1998"], 4), # from winter 98/99 to winter 01/02
-#                  rep.col(covScale[, "prey2002"], 5), # from winter 02/03 to winter 06/07
-#                  rep.col(covScale[, "prey2007"], 5), # from winter 07/08 to winter 11/12
-#                  rep.col(covScale[, "prey2012"], 5), # from winter 12/13 to winter 16/17
-#                  rep.col(covScale[, "prey2017"], 2), # from winter 17/18 to winter 18/19
-#                  rep.col(covScale[, "prey2019"], 1)) #  winter 19/20
+                     rep.col(covScale[, "roadLength2015"], 3), # from winter 15/16 to winter 17/18
+                     rep.col(covScale[, "roadLength2018"], 2)) # from winter 18/19 to winter 19/20
+pathLengthS <- cbind(rep.col(covScale[, "pathLength2014"], 23), # from winter 93/94 to winter 15/16
+                     rep.col(covScale[, "pathLength2019"], 4)) # from winter 16/17 to winter 19/20
+# Different methods for the paths, we use data for 2014 up until the winter 15/16
+# and we use the data for 2019 afterwards
+chaS <- cbind(rep.col(covScale[, "cha1990Cov"], 2), # from winter 93/94 to winter 94/95
+                 rep.col(covScale[, "cha1995Cov"], 5), # from winter 95/96 to winter 99/00
+                 rep.col(covScale[, "cha2000Cov"], 5), # from winter 00/01 to winter 04/05
+                 rep.col(covScale[, "cha2005Cov"], 5), # from winter 05/06 to winter 09/10
+                 rep.col(covScale[, "cha2010Cov"], 5), # from winter 10/11 to winter 14/15
+                 rep.col(covScale[, "cha2015Cov"], 3), # from winter 15/16 to winter 17/18
+                 rep.col(covScale[, "cha2018Cov"], 2)) # from winter 18/19 to winter 19/20
+deerS <- cbind(rep.col(covScale[, "deer1990Cov"], 2), # from winter 93/94 to winter 94/95
+              rep.col(covScale[, "deer1995Cov"], 5), # from winter 95/96 to winter 99/00
+              rep.col(covScale[, "deer2000Cov"], 5), # from winter 00/01 to winter 04/05
+              rep.col(covScale[, "deer2005Cov"], 5), # from winter 05/06 to winter 09/10
+              rep.col(covScale[, "deer2010Cov"], 5), # from winter 10/11 to winter 14/15
+              rep.col(covScale[, "deer2015Cov"], 3), # from winter 15/16 to winter 17/18
+              rep.col(covScale[, "deer2018Cov"], 2)) # from winter 18/19 to winter 19/20
 hfiS <- cbind(rep.col(covScale[, "hfi_1993"], 16), # from winter 93/94 to winter 08/09
                 rep.col(covScale[, "hfi_2009"], 11)) # from winter 09/10 to winter 19/20
 
@@ -279,10 +319,19 @@ dataFull <- list(nSites = nSites,
               distHighway = covScale[, "distHgwCov[, -1]"],
               distHighway2 = covScale[, "distHgwCov2[, -1]"],
               roadLength = roadLengthS,
+              pathLength = pathLengthS,
               hDens = covScale[, "hDensCov[, -1]"],
+              elevMean = covScale[, "meanElev"],
+              #elevSD = covScale[, "sdElev"],
               tri = covScale[, "triCov[, -1]"],
-              #prey = preyS,
+              chamois = chaS,
+              deer = deerS,
               hfi = hfiS,
+              stravaAll = covScale[, "meanStravaAll"],
+              #strava3cat = covScale[, "meanStrava3cat"],
+              #stravaRun = covScale[, "meanStravaRun"],
+              #stravaRide = covScale[, "meanStravaRide"],
+              #stravaWinter = covScale[, "meanStravaWinter"],
               binaryEffort = binaryEffortSampl,
               nSitesYear = apply(binaryEffortSampl, 2, sum),
               y = apply(obsLynxSampl, c(1, 3), sum))
@@ -320,15 +369,17 @@ model
   for(i in 1:2) {
     beta[i]  ~ dnorm(0, 1)
   }
-  for(i in 1:13) {
+  for(i in 1:19) {
     alpha[i] ~ dnorm(0, 1)
   }
   for(i in 1:nSites) {
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * distHighway2[i] + alpha[11] * hDens[i] + 
-        alpha[12] * tri[i] +  alpha[13] * hfi[i, j] + b[j] + u[i]
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * distHighway2[i] +
+        alpha[11] * roadLength[i, j] + alpha[12] * pathLength[i, j] + alpha[13] * hDens[i] + 
+        alpha[14] * elevMean[i] + alpha[15] * tri[i] + alpha[16] * hfi[i, j] + alpha[17] * stravaAll[i] +
+        alpha[18] * chamois[i, j] + alpha[19] * deer[i, j] + b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * roadLength[i, j] + v[i, j]
       p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(-binaryEffort[i, j]))
@@ -347,7 +398,7 @@ writeLines(model,"modelOcc.txt")
 # Initial value
 zst <- dataFull$y
 zst[zst > 0] <- 1
-init1 <- list(alpha = runif(13, -2, 2),
+init1 <- list(alpha = runif(19, -2, 2),
               beta = runif(2, -2, 2),
               z = zst,
               b = rep(0, nYears),
@@ -357,7 +408,7 @@ init1 <- list(alpha = runif(13, -2, 2),
               sd.b = 1,
               sd.u = 1,
               sd.v = 1)
-init2 <- list(alpha = runif(13, -2, 2),
+init2 <- list(alpha = runif(19, -2, 2),
               beta = runif(2, -2, 2),
               z = zst,
               b = rep(0, nYears),
@@ -389,8 +440,8 @@ lynxSim <- jags(data = dataFull,
                 model.file = "modelOcc.txt",
                 n.chains = 2,
                 n.burnin = 10000)
-save(lynxSim, file="outputs/lynxMCP100_dist2_noPreys.RData")
-load("outputs/lynxMCP100_dist2_noPreys.RData")
+save(lynxSim, file="outputs/lynxMCP100_dist2_chamDeer_elev_Strava.RData")
+load("outputs/lynxMCP100_dist2_chamDeer.RData")
 
 # Summary results
 round(lynxSim$summary, 2)
@@ -405,8 +456,9 @@ MCMCplot(object = lynxSim,
          params = 'alpha', 
          rank = TRUE,
          labels = c("Forest", "Forest connectivity", "Shrub", "Open land", "Agri21", "Agri22", "Agri23", "Agri24",
-                    "Distance to highways", "Distance to highways 2", "Human density", "Ruggedness", "Human footprint"))
-
+                    "Distance to highways", "Distance to highways 2", "Road length",
+                    "Path length", "Human density", "Mean elevation",  "Ruggedness", "Human footprint", 
+                    "Strava", "Chamois", "Deer"))
 
 #####################
 # Model predictions #
@@ -416,8 +468,9 @@ MCMCplot(object = lynxSim,
 
 # Function to recreate occupancy probabilities
 occEstimate <- function(matrixAlpa, vectorBeta, lengthCov, 
-                        covFor, covConnF, covShrub, covOpenL, covA21, covA22, covA23, 
-                        covA24, covDistH, covDistH2, covHDens, covTri, covHfi){
+                        covFor, covConnF, covShrub, covOpenL, covA21, covA22, covA23, covA24, 
+                        covDistH, covDistH2, covRoadLength, covPathLength, covHDens, 
+                        covElev, covTri, covHfi, covStrava, covCham, covDeer){
   
   mapsValues <- matrix(nrow = lengthCov, ncol = nrow(matrixAlpa))
   
@@ -426,8 +479,10 @@ occEstimate <- function(matrixAlpa, vectorBeta, lengthCov,
     logitVal <- matrixAlpa[i, 1] * covFor + matrixAlpa[i, 2] * covConnF + matrixAlpa[i, 3] * covShrub + 
       matrixAlpa[i, 4] * covOpenL + matrixAlpa[i, 5] * covA21 + matrixAlpa[i, 6] * covA22 + 
       matrixAlpa[i, 7] * covA23 + matrixAlpa[i, 8] * covA24 + matrixAlpa[i, 9] * covDistH + 
-      matrixAlpa[i, 10] * covDistH2 + matrixAlpa[i, 11] * covHDens + matrixAlpa[i, 12] * covTri + 
-      matrixAlpa[i, 13] * covHfi + vectorBeta[i]
+      matrixAlpa[i, 10] * covDistH2 + matrixAlpa[i, 11] * covRoadLength +
+      matrixAlpa[i, 12] * covPathLength + matrixAlpa[i, 13] * covHDens + matrixAlpa[i, 14] * covElev +
+      matrixAlpa[i, 15] * covTri + matrixAlpa[i, 16] * covHfi + matrixAlpa[i, 17] * covStrava +
+      matrixAlpa[i, 18] * covCham + matrixAlpa[i, 19] * covDeer + vectorBeta[i]
     
     mapsValues[, i] <- exp(logitVal) / (1 + exp(logitVal))
     #print(i)
@@ -476,7 +531,7 @@ ggdraw(ggplot() +
 load("data/gridFrCompleteCrop.RData")
 load("outputs/covariatesCover.RData") # forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, agri23Cov, agri24Cov
 load("outputs/covariatesRoads.RData") # distHgwCov, roadLengthCov
-load("outputs/covariatesOthers.RData") # hDensCov, triCov, preyCov, hfiCov
+load("outputs/covariatesOthers.RData") # hDensCov, triCov, chaCov, deerCov hfiCov
 load("data/effort_NovDecJanFebMarApr_1993_2020.RData") # effort
 # So we need the mean and sd on covariates where the cells never sampled were removed
 # But we compute occupancy probabilities over the whole landscape, even the cells that were never sampled
@@ -500,12 +555,22 @@ allDistH <- distHgwCov[, ncol(distHgwCov)]
 allDistHS <- as.numeric((allDistH - mean(covSampl[, "distHgwCov[, -1]"])) / sd(covSampl[, "distHgwCov[, -1]"]))
 allDistH2 <- allDistH * allDistH
 allDistHS2 <- as.numeric((allDistH2 - mean(covSampl[, "distHgwCov2[, -1]"])) / sd(covSampl[, "distHgwCov2[, -1]"]))
+allRdL <- roadLengthCov[, ncol(roadLengthCov)]
+allRdLS <- as.numeric((allRdL - mean(covSampl[, "roadLength2018"])) / sd(covSampl[, "roadLength2018"]))
+allPathL <- pathLengthCov[, ncol(pathLengthCov)]
+allPathLS <- as.numeric((allPathL - mean(covSampl[, "pathLength2023"])) / sd(covSampl[, "pathLength2023"]))
 allDensH <- hDensCov[, ncol(hDensCov)]
 allDensHS <- as.numeric((allDensH - mean(covSampl[, "hDensCov[, -1]"])) / sd(covSampl[, "hDensCov[, -1]"]))
+allElev <- elevCov[, "meanElev"]
+allElevS <- as.numeric((allElev - mean(covSampl[, "meanElev"])) / sd(covSampl[, "meanElev"]))
 allTri <- triCov[, ncol(triCov)]
 allTriS <- as.numeric((allTri - mean(covSampl[, "triCov[, -1]"])) / sd(covSampl[, "triCov[, -1]"]))
-# allPrey <- preyCov[, "prey2020"]
-# allPreyS <- as.numeric((allPrey - mean(covSampl[, "prey2020"])) / sd(covSampl[, "prey2020"]))
+allStrava <- stravaCov[, "meanStravaAll"]
+allStravaS <- as.numeric((allStrava - mean(covSampl[, "meanStravaAll"])) / sd(covSampl[, "meanStravaAll"]))
+allCham <- chaCov[, "cha2018Cov"]
+allChamS <- as.numeric((allCham - mean(covSampl[, "cha2018Cov"])) / sd(covSampl[, "cha2018Cov"]))
+allDeer <- deerCov[, "deer2018Cov"]
+allDeerS <- as.numeric((allDeer - mean(covSampl[, "deer2018Cov"])) / sd(covSampl[, "deer2018Cov"]))
 allHfi <- hfiCov[, ncol(hfiCov)]
 allHfiS <- as.numeric((allHfi - mean(covSampl[, "hfi_2009"])) / sd(covSampl[, "hfi_2009"]))
 
@@ -516,183 +581,50 @@ covSF <- st_as_sf(gridFrComplete) %>%
   mutate(allForS = allForS, allConnFS = allConnFS, allShrubS = allShrubS,
          allOpenLS = allOpenLS, allA21S = allA21S, allA22S = allA22S,
          allA23S = allA23S, allA24S = allA24S, allDistHS = allDistHS, allDistHS2 = allDistHS2,
-         allDensHS = allDensHS, allTriS = allTriS, #allPreyS = allPreyS,
-         allHfiS = allHfiS)
+         allRdLS = allRdLS, allPathLS = allPathLS, allDensHS = allDensHS, allElevS = allElevS,
+         allTriS = allTriS, allHfiS = allHfiS, allStravaS = allStrava, allChamS = allChamS, 
+         allDeerS = allDeerS)
 
-# Forest
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allForS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Forest")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allForS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Forest")
-print(plotWithPoints)
-# Forest connectivity
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allConnFS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Forest connectivity")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allConnFS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Forest connectivity")
-print(plotWithPoints)
-# Shrub
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allShrubS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Shrub")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allShrubS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Shrub")
-print(plotWithPoints)
-# Open land
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allOpenLS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Open land")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allOpenLS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Open land")
-print(plotWithPoints)
-# Agri 21
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA21S), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Agr21")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA21S), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Agri 21")
-print(plotWithPoints)
-# Agri 22
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA22S), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Agri 22")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA22S), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Agri 22")
-print(plotWithPoints)
-# Agri 23
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA23S), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Agri 23")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA23S), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Agri 23")
-print(plotWithPoints)
-# Agri 24
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA24S), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Agri 24")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allA24S), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Agri 24")
-print(plotWithPoints)
-# Distance to highways
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Distance to highways")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Distance to highways")
-print(plotWithPoints)
-# Distance to highways squared
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS2), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Distance to highways2")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDistHS2), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Distance to highways2")
-print(plotWithPoints)
-# Human density
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDensHS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Human density")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allDensHS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Human density")
-print(plotWithPoints)
-# TRI
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allTriS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Terrain ruggeness")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allTriS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Terrain ruggeness")
-print(plotWithPoints)
-# # Prey
-# plotWithoutPoints <- ggplot() + 
-#   geom_sf(data = covSF, aes(fill = allPreyS), color = NA) +
-#   scale_fill_viridis_c() +
-#   ggtitle("Preys")
-# print(plotWithoutPoints)
-# plotWithPoints <- ggplot() + 
-#   geom_sf(data = covSF, aes(fill = allPreyS), color = NA) + 
-#   scale_fill_viridis_c() +
-#   geom_sf(data = dataP, shape = 4) +
-#   ggtitle("Preys")
-# print(plotWithPoints)
-# HFI
-plotWithoutPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allHfiS), color = NA) +
-  scale_fill_viridis_c() +
-  ggtitle("Human footprint")
-print(plotWithoutPoints)
-plotWithPoints <- ggplot() + 
-  geom_sf(data = covSF, aes(fill = allHfiS), color = NA) + 
-  scale_fill_viridis_c() +
-  geom_sf(data = dataP, shape = 4) +
-  ggtitle("Human footprint")
-print(plotWithPoints)
+plotMapCov <- function(covToPlot, title){
+  plotWithoutPoints <- ggplot() + 
+    geom_sf(data = covSF, aes(fill = covToPlot), color = NA) +
+    scale_fill_viridis_c() +
+    ggtitle(title)
+  print(plotWithoutPoints)
+  plotWithPoints <- ggplot() + 
+    geom_sf(data = covSF, aes(fill = covToPlot), color = NA) + 
+    scale_fill_viridis_c() +
+    geom_sf(data = dataP, shape = 4) +
+    ggtitle(title)
+  print(plotWithPoints)
+}
+
+plotMapCov(covToPlot = allForS, title = "Forest")
+plotMapCov(covToPlot = allConnFS, title = "Forest connectivity")
+plotMapCov(covToPlot = allShrubS, title = "Shrub")
+plotMapCov(covToPlot = allOpenLS, title = "Open land")
+plotMapCov(covToPlot = allA21S, title = "Agri 21")
+plotMapCov(covToPlot = allA22S, title = "Agri 22")
+plotMapCov(covToPlot = allA23S, title = "Agri 23")
+plotMapCov(covToPlot = allA24S, title = "Agri 24")
+plotMapCov(covToPlot = allDistHS, title = "Distance to highways")
+plotMapCov(covToPlot = allDistHS2, title = "Distance to highways2")
+plotMapCov(covToPlot = allRdLS, title = "Total road length")
+plotMapCov(covToPlot = allPathLS, title = "Total path length")
+plotMapCov(covToPlot = allDensHS, title = "Human density")
+plotMapCov(covToPlot = allElevS, title = "Elevation")
+plotMapCov(covToPlot = allTriS, title = "Terrain ruggeness")
+plotMapCov(covToPlot = allHfiS, title = "Human footprint")
+plotMapCov(covToPlot = allStravaS, title = "Strava")
+plotMapCov(covToPlot = allChamS, title = "Chamois")
+plotMapCov(covToPlot = allDeerS, title = "Deer")
 
 allMapsValues <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = length(allForS), 
                              covFor = allForS, covConnF = allConnFS, covShrub = allShrubS, covOpenL = allOpenLS, 
-                             covA21 = allA21S, covA22 = allA22S, covA23 = allA23S, covA24 = allA24S, covDistH = allDistHS, covDistH2 = allDistHS2, 
-                             covHDens = allDensHS, covTri = allTriS, #covPrey = allPreyS, 
-                             covHfi = allHfiS)
+                             covA21 = allA21S, covA22 = allA22S, covA23 = allA23S, covA24 = allA24S, covDistH = allDistHS, 
+                             covDistH2 = allDistHS2, covRoadLength = allRdLS, covPathLength = allPathLS,
+                             coElev = allElevS, covHDens = allDensHS, covTri = allTriS, covHfi = allHfiS,
+                             covStrava = allStravaS, covCham = allChamS, covDeer = allDeerS)
 
 # Compute the mean and quantiles for each cell over all iterations
 meanOcc <- rowMeans(allMapsValues, na.rm = TRUE)
@@ -704,14 +636,14 @@ mapPotentialOcc <- covSF %>%
 # Plot predicted occupancy probability with data points
 plotWithoutPoints <- ggplot() + 
   geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) +
-  scale_fill_viridis_c(name = "Occupancy prob.") #+
-  #ggtitle("Mean occupancy predicted")
+  scale_fill_viridis_c(name = "Occupancy prob.") +
+  ggtitle("Mean occupancy predicted")
 print(plotWithoutPoints)
 plotWithPoints <- ggplot() + 
   geom_sf(data = mapPotentialOcc, aes(fill = meanOcc), color = NA) + 
   scale_fill_viridis_c(name = "Occupancy prob.") +
-  geom_sf(data = dataP, shape = 4, color = alpha("black", 0.2)) #+
-  #ggtitle("Mean occupancy predicted")
+  geom_sf(data = dataP, shape = 4, color = alpha("black", 0.2)) +
+  ggtitle("Mean occupancy predicted")
 print(plotWithPoints)
 
 # Create figures of mean occupancy as a function of each covariate while the other covariates are at their mean value
@@ -728,8 +660,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = covValS, 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -750,8 +681,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = covValS, covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 # Compute the mean and CI occupancy probabilities
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
@@ -760,26 +690,47 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
-# ## Prey
-# # Define the range of value for the covariate
-# covVal <- as.numeric(allPrey)
-# covValForScaling <- as.numeric(covSampl[, "prey2020"])
-# rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
-# covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
-# covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
-# # Estimate occupancy for this range of values for this covariate with all the others at their mean value
-# valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
-#                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
-#                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
-#                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-#                       covPrey = covValS, covHfi = mean(allHfiS))
-# meanOcc <- rowMeans(valFor, na.rm = TRUE)
-# quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
-# # Compute the mean and CI occupancy probabilities
-# plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
-#      xlab = "Preys", ylab = "Occupancy probability")
-# lines(x = covValTest, y = quantileOcc[1,], lty = 2)
-# lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+## Chamois
+# Define the range of value for the covariate
+covVal <- as.numeric(allCham)
+covValForScaling <- as.numeric(covSampl[, "cha2018Cov"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS),
+                      covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S),
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS),
+                      covHfi = mean(allHfiS), covCham = covValS, covDeer = mean(allDeerS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Chamois", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Deer
+# Define the range of value for the covariate
+covVal <- as.numeric(allDeer)
+covValForScaling <- as.numeric(covSampl[, "deer2018Cov"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS),
+                      covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S),
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS),
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = covValS)
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Deer", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
 ## Shrub
 # Define the range of value for the covariate
@@ -793,8 +744,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = covValS, covOpenL = mean(allOpenLS), 
                       covA21 = mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -814,8 +764,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 = covValS, covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -835,8 +784,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = covValS, covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -858,8 +806,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = covValS, covDistH2 = covValS2, covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities
@@ -879,8 +826,7 @@ valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 
                       covFor = mean(allForS), covConnF = covValS, covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
                       covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
                       covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covHDens = mean(allDensHS), covTri = mean(allTriS), 
-                      #covPrey = mean(allPreyS), 
-                      covHfi = mean(allHfiS))
+                      covHfi = mean(allHfiS), covCham = mean(allChamS), covDeer = mean(allDeerS))
 meanOcc <- rowMeans(valFor, na.rm = TRUE)
 quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
 # Compute the mean and CI occupancy probabilities

@@ -29,15 +29,17 @@ model
   for(i in 1:2) {
     beta[i]  ~ dnorm(0, 1)
   }
-  for(i in 1:13) {
+  for(i in 1:19) {
     alpha[i] ~ dnorm(0, 1)
   }
   for(i in 1:nSites) {
     for(j in 1:nYears) {
       logit(phi[i, j]) <- alpha[1] * forest[i, j] + alpha[2] * connectForest[i, j] + alpha[3] * shrub[i, j] + 
         alpha[4] * openLand[i, j] + alpha[5] * agri21[i, j] + alpha[6] * agri22[i, j] + alpha[7] * agri23[i, j] + 
-        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * distHighway2[i] + alpha[11] * hDens[i] + 
-        alpha[12] * tri[i] +  alpha[13] * hfi[i, j] + b[j] + u[i]
+        alpha[8] * agri24[i, j] + alpha[9] * distHighway[i] + alpha[10] * distHighway2[i] +
+        alpha[11] * roadLength[i, j] + alpha[12] * pathLength[i, j] + alpha[13] * hDens[i] + 
+        alpha[14] * elevMean[i] + alpha[15] * tri[i] + alpha[16] * hfi[i, j] + alpha[17] * stravaAll[i] +
+        alpha[18] * chamois[i, j] + alpha[19] * deer[i, j] + b[j] + u[i]
       z[i, j] ~ dbern(phi[i, j]) # True presence/absences states
       lp[i, j] <- beta[1] + beta[2] * roadLength[i, j] + v[i, j]
       p[i, j] <- (1 / (1 + exp(- lp[i, j]))) * (1 - step(-binaryEffort[i, j]))

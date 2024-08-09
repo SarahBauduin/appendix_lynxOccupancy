@@ -6,11 +6,7 @@ library(sf)
 library(dplyr)
 library(terra)
 library(spatialEco)
-# library(rgeos)
-# library(geojsonio)
-# library(stringr)
-# library(tidyr)
-# library(janitor)
+library(osmextract)
 
 # # Covariates to run the lynx occupancy model
 # # Grid cell on which covariates must be computed
@@ -221,13 +217,18 @@ save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov,
 ##########################################################
 
 
-###############
-## ROAD DATA ##
-###############
-# Route500 data from 2012, 2015, and 2018
+#################
+## LINEAR DATA ##
+#################
+# Route500 data from 2012, 2015, and 2018 for the main roads
 roads2012 <- st_read("data/route500/2012/TRONCON_ROUTE.shp")
 roads2015 <- st_read("data/route500/2015/TRONCON_ROUTE.shp")
 roads2018 <- st_read("data/route500/2018/TRONCON_ROUTE.shp")
+# OpenStreetMap from 2014, 2019, 2023 for the paths
+france2014 <- oe_read("data/openStreetMap/france-140101.osm.pbf")
+france2019 <- oe_read("data/openStreetMap/france-190101.osm.pbf")
+france2023 <- oe_read("data/openStreetMap/france-230101.osm.pbf")
+
 # Highways from 2014
 highways <- st_read("data/highways/cropHighways.shp") 
 # not to the exact extent of the grid to calculate closest highway which may be outside of the grid extent
@@ -293,9 +294,62 @@ for(i in 1:length(listRoads)){
   print(i)
 }
 
+
+##############
+## Path length 
+path2014Tr <- france2014 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+path2019Tr <- france2019 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+path2023Tr <- france2023 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+listPaths <- list()
+listPaths[[1]] <- path2014Tr
+listPaths[[2]] <- path2019Tr
+listPaths[[3]] <- path2023Tr
+
+# Total path length in each cell
+pathLengthCov <- data.frame(ID = gridFrComplete$ID)
+
+for(i in 1:length(listPaths)){
+  
+  pathIn <- st_intersection(gridFrComplete, listPaths[[i]]) %>% # extract all the path inside each cell
+    mutate(x = st_length(.)) # calculate the length of the paths per cell ID
+  lengthPathCells <- st_drop_geometry(pathIn)[,c("ID","x")]
+  lengthPathCells$x <- as.numeric(lengthPathCells$x)
+  
+  # Not all cells had path in it
+  withoutPath <- setdiff(gridFrComplete$ID, lengthPathCells$ID) # cells without path in it
+  lengthPathID <- c(lengthPathCells$ID, withoutPath)
+  lengthPaths <- c(lengthPathCells$x, rep(0, length(withoutPath))) # put 0 as the length of path in the empty cells
+  lengthPathsOrder <- cbind(lengthPathID, lengthPaths)
+  lengthPathsOrderID <- lengthPathsOrder[order(match(lengthPathsOrder[,"lengthPathID"] ,gridFrComplete$ID)),]
+  
+  pathLengthCov <- cbind.data.frame(pathLengthCov, as.data.frame(lengthPathsOrderID)[,"lengthPaths"])
+  if(i == 1){
+    colnames(pathLengthCov)[i+1] <- "pathLength2014"
+  } else if(i == 2){
+    colnames(pathLengthCov)[i+1] <- "pathLength2019"
+  } else if(i == 3){
+    colnames(pathLengthCov)[i+1] <- "pathLength2023"
+  }
+  print(i)
+}
+
+
 ##################
 ## Save covariates
-save(distHgwCov, roadLengthCov, file = "outputs/covariatesRoads.RData")
+save(distHgwCov, roadLengthCov, pathLengthCov, 
+     file = "outputs/covariatesRoads.RData")
 
 ###############################################################
 
@@ -328,13 +382,20 @@ hDensCov[is.na(hDensCov)] <- 0
 ## ELEVATION DATA ##
 ####################
 # Elevation data on 25 m x 25 m resolution
-elev1 <- rast("data/elevation/032ab314564b9cb72c98fbeb093aeaf69720fbfd/eu_dem_v11_E30N20.TIF")# 
+elev1 <- rast("data/elevation/032ab314564b9cb72c98fbeb093aeaf69720fbfd/eu_dem_v11_E30N20.TIF") 
 gridFrCompleteTr <- gridFrComplete %>%
   st_transform(crs = st_crs(elev1))
 elev1 <- terra::crop(elev1, st_sf(st_union(gridFrCompleteTr)))
 elev2 <- rast("data/elevation/97824c12f357f50638d665b5a58707cd82857d57/eu_dem_v11_E40N20.TIF")
 elev2 <- terra::crop(elev2, st_sf(st_union(gridFrCompleteTr)))
 elevation <- terra::merge(elev1, elev2)
+
+# Compute mean and sd elevation on 100 km2 cells
+elevMean <- elevation %>% 
+  terra::extract(gridFrCompleteTr) %>% 
+  group_by(ID) %>% 
+  summarise(meanElev = mean(Band_1), sdElev = sd(Band_1))
+elevCov <- as.data.frame(elevMean)
 
 
 #############
@@ -343,7 +404,7 @@ elevation <- terra::merge(elev1, elev2)
 elevAggr <- terra::aggregate(elevation, fact = 40, fun = "mean", na.rm = TRUE)
 elevTRI <- tri(elevAggr)
 
-# Compute the number of 1km2 "rugged cells" into 100km2 cells
+# Compute the number of 1 km2 "rugged cells" into 100 km2 cells
 elevTRI[elevTRI < 162] <- 0 # 162 = "intermediately rugged surface"
 elevTRI[elevTRI >= 162] <- 0.01
 elevTRI_100km2 <- aggregate(elevTRI, fact = 10, fun = sum, na.rm = TRUE)
@@ -355,9 +416,76 @@ triCov <- cbind.data.frame(ID = gridFrCompleteTr$ID, tri = triCells[ ,2])
 ################
 ## TALLY DATA ##
 ################
+# Chamois data
+cha1985 <- st_read("data/ungulates/CHA_1985_departement_L93_1698223650_4441/CHA_1985_departement_L93_1698223650_4441/CHA_1985_departement_L93.shp")
+cha1990 <- st_read("data/ungulates/CHA_1991_departement_L93_1698224637_3806/CHA_1991_departement_L93_1698224637_3806/CHA_1991_departement_L93.shp")
+cha1995 <- st_read("data/ungulates/CHA_1995_departement_L93_1698223650_3646/CHA_1995_departement_L93_1698223650_3646/CHA_1995_departement_L93.shp")
+cha2000 <- st_read("data/ungulates/CHA_2000_departement_L93_1698223650_1913/CHA_2000_departement_L93_1698223650_1913/CHA_2000_departement_L93.shp")
+cha2005 <- st_read("data/ungulates/CHA_2005_departement_L93_1698223650_3713/CHA_2005_departement_L93_1698223650_3713/CHA_2005_departement_L93.shp")
+cha2010 <- st_read("data/ungulates/CHA_2010_departement_L93_1698223650_2960/CHA_2010_departement_L93_1698223650_2960/CHA_2010_departement_L93.shp")
+cha2015 <- st_read("data/ungulates/CHA_2015_departement_L93_1698223650_3241/CHA_2015_departement_L93_1698223650_3241/CHA_2015_departement_L93.shp")
+cha2018 <- st_read("data/ungulates/CHA_2018_departement_L93_1698235389_8043/CHA_2018_departement_L93_1698235389_8043/CHA_2018_departement_L93.shp")
+# Deer data
+deer1985 <- st_read("data/ungulates/CHE_1985_departement_L93_1698223584_8629/CHE_1985_departement_L93_1698223584_8629/CHE_1985_departement_L93.shp")
+deer1990 <- st_read("data/ungulates/CHE_1990_departement_L93_1698223583_9203/CHE_1990_departement_L93_1698223583_9203/CHE_1990_departement_L93.shp")
+deer1995 <- st_read("data/ungulates/CHE_1995_departement_L93_1698223583_1133/CHE_1995_departement_L93_1698223583_1133/CHE_1995_departement_L93.shp")
+deer2000 <- st_read("data/ungulates/CHE_2000_departement_L93_1698223583_4856/CHE_2000_departement_L93_1698223583_4856/CHE_2000_departement_L93.shp")
+deer2005 <- st_read("data/ungulates/CHE_2005_departement_L93_1698223583_3019/CHE_2005_departement_L93_1698223583_3019/CHE_2005_departement_L93.shp")
+deer2010 <- st_read("data/ungulates/CHE_2010_departement_L93_1698223583_2115/CHE_2010_departement_L93_1698223583_2115/CHE_2010_departement_L93.shp")
+deer2015 <- st_read("data/ungulates/CHE_2015_departement_L93_1698223583_4561/CHE_2015_departement_L93_1698223583_4561/CHE_2015_departement_L93.shp")
+deer2018 <- st_read("data/ungulates/CHE_2018_departement_L93_1698235371_2084/CHE_2018_departement_L93_1698235371_2084/CHE_2018_departement_L93.shp")
 
 ####################
 ## Prey availability
+gridFr_sf <- gridFrComplete %>%
+  st_transform(crs = st_crs(cha1985))
+
+# Compute preys density per km2
+preyDensFun <- function(dataUngulates, nameColYear){
+  dataUngulates <- dataUngulates %>% 
+    mutate(area = st_area(.)) %>% 
+    mutate(preyDens = Realstn / area) %>% 
+    st_intersection(gridFr_sf) %>% 
+    mutate(areaInter = st_area(.)) %>% 
+    mutate(preyDensInter = preyDens * (areaInter / area.1)) %>% # ratio of the cell
+    group_by(ID) %>% 
+    summarise(preyDensMean = sum(preyDensInter)) %>% 
+    select(ID, preyDensMean) %>% 
+    st_drop_geometry() %>% 
+    as.data.frame()
+  # Fill with 0 the missing data
+  ungCov <- data.frame(ID = gridFrComplete$ID)
+  ungCov <- merge(ungCov, dataUngulates, all = TRUE)
+  ungCov$preyDensMean <- as.numeric(ungCov$preyDensMean)
+  ungCov[is.na(ungCov)] <- 0
+  colnames(ungCov)[2] <- nameColYear
+  return(ungCov)
+}
+
+# Chamois
+cha1985Cov <- preyDensFun(dataUngulates = cha1985, nameColYear = "cha1985")
+cha1990Cov <- preyDensFun(dataUngulates = cha1990, nameColYear = "cha1990")
+cha1995Cov <- preyDensFun(dataUngulates = cha1995, nameColYear = "cha1995")
+cha2000Cov <- preyDensFun(dataUngulates = cha2000, nameColYear = "cha2000")
+cha2005Cov <- preyDensFun(dataUngulates = cha2005, nameColYear = "cha2005")
+cha2010Cov <- preyDensFun(dataUngulates = cha2010, nameColYear = "cha2010")
+cha2015Cov <- preyDensFun(dataUngulates = cha2015, nameColYear = "cha2015")
+cha2018Cov <- preyDensFun(dataUngulates = cha2018, nameColYear = "cha2018")
+chaCov <- cbind.data.frame(cha1985Cov, cha1990Cov = cha1990Cov[, 2], cha1995Cov = cha1995Cov[, 2], 
+                           cha2000Cov = cha2000Cov[, 2], cha2005Cov = cha2005Cov[, 2], cha2010Cov = cha2010Cov[, 2], 
+                           cha2015Cov = cha2015Cov[, 2], cha2018Cov = cha2018Cov[, 2])
+# Deer
+deer1985Cov <- preyDensFun(dataUngulates = deer1985, nameColYear = "deer1985")
+deer1990Cov <- preyDensFun(dataUngulates = deer1990, nameColYear = "deer1990")
+deer1995Cov <- preyDensFun(dataUngulates = deer1995, nameColYear = "deer1995")
+deer2000Cov <- preyDensFun(dataUngulates = deer2000, nameColYear = "deer2000")
+deer2005Cov <- preyDensFun(dataUngulates = deer2005, nameColYear = "deer2005")
+deer2010Cov <- preyDensFun(dataUngulates = deer2010, nameColYear = "deer2010")
+deer2015Cov <- preyDensFun(dataUngulates = deer2015, nameColYear = "deer2015")
+deer2018Cov <- preyDensFun(dataUngulates = deer2018, nameColYear = "deer2018")
+deerCov <- cbind.data.frame(deer1985Cov, deer1990Cov = deer1990Cov[, 2], deer1995Cov = deer1995Cov[, 2], 
+                            deer2000Cov = deer2000Cov[, 2], deer2005Cov = deer2005Cov[, 2], deer2010Cov = deer2010Cov[, 2], 
+                            deer2015Cov = deer2015Cov[, 2], deer2018Cov = deer2018Cov[, 2])
 
 
 ###########################
@@ -384,10 +512,33 @@ hfiCov <- cbind.data.frame(ID = gridFrComplete$ID,
                            hfi_2009 = hfiCells_2009[, 2])
 
 
+############
+## STRAVA ##
+############
+# Strava
+strava <- rast("data/strava/heatmap_strava_20220414_100_all.tiff")
+# 4 layers
+# layer 1 = all
+# layer 2 = run
+# layer 3 = ride
+# layer 4 = winter
+gridFrCompleteTr <- gridFrComplete %>%
+  st_transform(crs = st_crs(strava))
+stravaMean <- strava %>% 
+  terra::extract(gridFrCompleteTr) %>% 
+  mutate(strava3cat = heatmap_strava_20220414_100_all_2 + heatmap_strava_20220414_100_all_3 + 
+           heatmap_strava_20220414_100_all_4) %>% 
+  group_by(ID) %>% 
+  summarise(meanStravaAll = mean(heatmap_strava_20220414_100_all_1), meanStrava3cat = mean(strava3cat),
+            meanStravaRun = mean(heatmap_strava_20220414_100_all_2), meanStravaRide = mean(heatmap_strava_20220414_100_all_3),
+            meanStravaWinter = mean(heatmap_strava_20220414_100_all_4))
+stravaCov <- as.data.frame(stravaMean)
+
+
 ##################
 ## Save covariates
-save(hDensCov, triCov, #preyCov, 
-     hfiCov, file = "outputs/covariatesOthers.RData")
+save(hDensCov, elevCov, triCov, chaCov, deerCov, hfiCov, stravaCov,
+     file = "outputs/covariatesOthers.RData")
 
 ########################################################################
 
