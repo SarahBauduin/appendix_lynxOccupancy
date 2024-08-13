@@ -416,76 +416,6 @@ triCov <- cbind.data.frame(ID = gridFrCompleteTr$ID, tri = triCells[ ,2])
 ################
 ## TALLY DATA ##
 ################
-# Chamois data
-cha1985 <- st_read("data/ungulates/CHA_1985_departement_L93_1698223650_4441/CHA_1985_departement_L93_1698223650_4441/CHA_1985_departement_L93.shp")
-cha1990 <- st_read("data/ungulates/CHA_1991_departement_L93_1698224637_3806/CHA_1991_departement_L93_1698224637_3806/CHA_1991_departement_L93.shp")
-cha1995 <- st_read("data/ungulates/CHA_1995_departement_L93_1698223650_3646/CHA_1995_departement_L93_1698223650_3646/CHA_1995_departement_L93.shp")
-cha2000 <- st_read("data/ungulates/CHA_2000_departement_L93_1698223650_1913/CHA_2000_departement_L93_1698223650_1913/CHA_2000_departement_L93.shp")
-cha2005 <- st_read("data/ungulates/CHA_2005_departement_L93_1698223650_3713/CHA_2005_departement_L93_1698223650_3713/CHA_2005_departement_L93.shp")
-cha2010 <- st_read("data/ungulates/CHA_2010_departement_L93_1698223650_2960/CHA_2010_departement_L93_1698223650_2960/CHA_2010_departement_L93.shp")
-cha2015 <- st_read("data/ungulates/CHA_2015_departement_L93_1698223650_3241/CHA_2015_departement_L93_1698223650_3241/CHA_2015_departement_L93.shp")
-cha2018 <- st_read("data/ungulates/CHA_2018_departement_L93_1698235389_8043/CHA_2018_departement_L93_1698235389_8043/CHA_2018_departement_L93.shp")
-# Deer data
-deer1985 <- st_read("data/ungulates/CHE_1985_departement_L93_1698223584_8629/CHE_1985_departement_L93_1698223584_8629/CHE_1985_departement_L93.shp")
-deer1990 <- st_read("data/ungulates/CHE_1990_departement_L93_1698223583_9203/CHE_1990_departement_L93_1698223583_9203/CHE_1990_departement_L93.shp")
-deer1995 <- st_read("data/ungulates/CHE_1995_departement_L93_1698223583_1133/CHE_1995_departement_L93_1698223583_1133/CHE_1995_departement_L93.shp")
-deer2000 <- st_read("data/ungulates/CHE_2000_departement_L93_1698223583_4856/CHE_2000_departement_L93_1698223583_4856/CHE_2000_departement_L93.shp")
-deer2005 <- st_read("data/ungulates/CHE_2005_departement_L93_1698223583_3019/CHE_2005_departement_L93_1698223583_3019/CHE_2005_departement_L93.shp")
-deer2010 <- st_read("data/ungulates/CHE_2010_departement_L93_1698223583_2115/CHE_2010_departement_L93_1698223583_2115/CHE_2010_departement_L93.shp")
-deer2015 <- st_read("data/ungulates/CHE_2015_departement_L93_1698223583_4561/CHE_2015_departement_L93_1698223583_4561/CHE_2015_departement_L93.shp")
-deer2018 <- st_read("data/ungulates/CHE_2018_departement_L93_1698235371_2084/CHE_2018_departement_L93_1698235371_2084/CHE_2018_departement_L93.shp")
-
-####################
-## Prey availability
-gridFr_sf <- gridFrComplete %>%
-  st_transform(crs = st_crs(cha1985))
-
-# Compute preys density per km2
-preyDensFun <- function(dataUngulates, nameColYear){
-  dataUngulates <- dataUngulates %>% 
-    mutate(area = st_area(.)) %>% 
-    mutate(preyDens = Realstn / area) %>% 
-    st_intersection(gridFr_sf) %>% 
-    mutate(areaInter = st_area(.)) %>% 
-    mutate(preyDensInter = preyDens * (areaInter / area.1)) %>% # ratio of the cell
-    group_by(ID) %>% 
-    summarise(preyDensMean = sum(preyDensInter)) %>% 
-    dplyr::select(ID, preyDensMean) %>% 
-    st_drop_geometry() %>% 
-    as.data.frame()
-  # Fill with 0 the missing data
-  ungCov <- data.frame(ID = gridFrComplete$ID)
-  ungCov <- merge(ungCov, dataUngulates, all = TRUE)
-  ungCov$preyDensMean <- as.numeric(ungCov$preyDensMean)
-  ungCov[is.na(ungCov)] <- 0
-  colnames(ungCov)[2] <- nameColYear
-  return(ungCov)
-}
-
-# Chamois
-cha1985Cov <- preyDensFun(dataUngulates = cha1985, nameColYear = "cha1985")
-cha1990Cov <- preyDensFun(dataUngulates = cha1990, nameColYear = "cha1990")
-cha1995Cov <- preyDensFun(dataUngulates = cha1995, nameColYear = "cha1995")
-cha2000Cov <- preyDensFun(dataUngulates = cha2000, nameColYear = "cha2000")
-cha2005Cov <- preyDensFun(dataUngulates = cha2005, nameColYear = "cha2005")
-cha2010Cov <- preyDensFun(dataUngulates = cha2010, nameColYear = "cha2010")
-cha2015Cov <- preyDensFun(dataUngulates = cha2015, nameColYear = "cha2015")
-cha2018Cov <- preyDensFun(dataUngulates = cha2018, nameColYear = "cha2018")
-chaCov <- cbind.data.frame(cha1985Cov, cha1990Cov = cha1990Cov[, 2], cha1995Cov = cha1995Cov[, 2], 
-                           cha2000Cov = cha2000Cov[, 2], cha2005Cov = cha2005Cov[, 2], cha2010Cov = cha2010Cov[, 2], 
-                           cha2015Cov = cha2015Cov[, 2], cha2018Cov = cha2018Cov[, 2])
-# Deer
-deer1985Cov <- preyDensFun(dataUngulates = deer1985, nameColYear = "deer1985")
-deer1990Cov <- preyDensFun(dataUngulates = deer1990, nameColYear = "deer1990")
-deer1995Cov <- preyDensFun(dataUngulates = deer1995, nameColYear = "deer1995")
-deer2000Cov <- preyDensFun(dataUngulates = deer2000, nameColYear = "deer2000")
-deer2005Cov <- preyDensFun(dataUngulates = deer2005, nameColYear = "deer2005")
-deer2010Cov <- preyDensFun(dataUngulates = deer2010, nameColYear = "deer2010")
-deer2015Cov <- preyDensFun(dataUngulates = deer2015, nameColYear = "deer2015")
-deer2018Cov <- preyDensFun(dataUngulates = deer2018, nameColYear = "deer2018")
-deerCov <- cbind.data.frame(deer1985Cov, deer1990Cov = deer1990Cov[, 2], deer1995Cov = deer1995Cov[, 2], 
-                            deer2000Cov = deer2000Cov[, 2], deer2005Cov = deer2005Cov[, 2], deer2010Cov = deer2010Cov[, 2], 
-                            deer2015Cov = deer2015Cov[, 2], deer2018Cov = deer2018Cov[, 2])
 
 
 ###########################
@@ -514,7 +444,7 @@ hfiCov <- cbind.data.frame(ID = gridFrComplete$ID,
 
 ##################
 ## Save covariates
-save(hDensCov, elevCov, triCov, chaCov, deerCov, hfiCov,
+save(hDensCov, elevCov, triCov, hfiCov,
      file = "outputs/covariatesOthers.RData")
 
 ########################################################################
