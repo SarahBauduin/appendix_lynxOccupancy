@@ -636,7 +636,6 @@ plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(qua
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
-
 ## Shrub
 # Define the range of value for the covariate
 covVal <- as.numeric(allShrub)
@@ -698,6 +697,111 @@ quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm =
 # Compute the mean and CI occupancy probabilities
 plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
      xlab = "Agri22 cover", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Agri23
+covVal <- as.numeric(allA23)
+covValForScaling <- as.numeric(covSampl[, "agri23_2018"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = covValS, covA24 = mean(allA24S), 
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covRoadLength = mean(allRdLS), covPathLength = mean(allPathLS),
+                      covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      covHfi = mean(allHfiS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Agri23 cover", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Agri24
+covVal <- as.numeric(allA24)
+covValForScaling <- as.numeric(covSampl[, "agri24_2018"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = covValS, 
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covRoadLength = mean(allRdLS), covPathLength = mean(allPathLS),
+                      covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      covHfi = mean(allHfiS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Agri24 cover", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Open land
+covVal <- as.numeric(allOpenL)
+covValForScaling <- as.numeric(covSampl[, "agri24_2018"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = covValS, 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covRoadLength = mean(allRdLS), covPathLength = mean(allPathLS),
+                      covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      covHfi = mean(allHfiS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Open land", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Human density
+covVal <- as.numeric(allDensH)
+covValForScaling <- as.numeric(covSampl[, "hDensCov[, -1]"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covRoadLength = mean(allRdLS), covPathLength = mean(allPathLS),
+                      covHDens = covValS, covTri = mean(allTriS), 
+                      covHfi = mean(allHfiS))
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Human density", ylab = "Occupancy probability")
+lines(x = covValTest, y = quantileOcc[1,], lty = 2)
+lines(x = covValTest, y = quantileOcc[2,], lty = 2)
+
+## Human footprint
+covVal <- as.numeric(allHfi)
+covValForScaling <- as.numeric(covSampl[, "hDensCov[, -1]"])
+rangeCov <- c(min(covVal, na.rm = TRUE), max(covVal, na.rm = TRUE))
+covValTest <- seq(from = rangeCov[1], to = rangeCov[2], length.out = 100) # test 100 values for the covariates in the natural range in the landscape
+covValS <- (covValTest - mean(covValForScaling)) / sd(covValForScaling)
+# Estimate occupancy for this range of values for this covariate with all the others at their mean value
+valFor <- occEstimate(matrixAlpa = alphaEstim, vectorBeta = bEstim, lengthCov = 100,
+                      covConnF = mean(allConnFS), covShrub = mean(allShrubS), covOpenL = mean(allOpenLS), 
+                      covA21 =  mean(allA21S), covA22 = mean(allA22S), covA23 = mean(allA23S), covA24 = mean(allA24S), 
+                      covDistH = mean(allDistHS), covDistH2 = mean(allDistHS2), covRoadLength = mean(allRdLS), covPathLength = mean(allPathLS),
+                      covHDens = mean(allDensHS), covTri = mean(allTriS), 
+                      covHfi = covValS)
+meanOcc <- rowMeans(valFor, na.rm = TRUE)
+quantileOcc <- apply(valFor, 1, function(x) quantile(x, c(0.025, 0.975), na.rm = TRUE))
+# Compute the mean and CI occupancy probabilities
+plot(x = covValTest, y = meanOcc, type = "l", ylim = c(min(quantileOcc), max(quantileOcc)), lwd = 2,
+     xlab = "Human footptrint", ylab = "Occupancy probability")
 lines(x = covValTest, y = quantileOcc[1,], lty = 2)
 lines(x = covValTest, y = quantileOcc[2,], lty = 2)
 
