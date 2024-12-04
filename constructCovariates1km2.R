@@ -485,9 +485,35 @@ hfiCov <- cbind.data.frame(ID = grid1$ID,
                            hfi_2009 = hfiCells_2009[, 2])
 
 
+############
+## STRAVA ##
+############
+# Strava
+strava <- rast("data/strava/heatmap_strava_20220414_100_all.tiff")
+# 4 layers
+# layer 1 = all
+# layer 2 = run
+# layer 3 = ride
+# layer 4 = winter
+
+grid1Tr <- grid1 %>%
+  st_transform(crs = st_crs(strava))
+
+stravaMean <- strava %>% 
+  terra::extract(grid1Tr) %>% 
+  mutate(strava3cat = heatmap_strava_20220414_100_all_2 + heatmap_strava_20220414_100_all_3 + 
+           heatmap_strava_20220414_100_all_4) %>% 
+  group_by(ID) %>% 
+  summarise(meanStravaAll = mean(heatmap_strava_20220414_100_all_1), meanStrava3cat = mean(strava3cat),
+            meanStravaRun = mean(heatmap_strava_20220414_100_all_2), meanStravaRide = mean(heatmap_strava_20220414_100_all_3),
+            meanStravaWinter = mean(heatmap_strava_20220414_100_all_4))
+
+stravaCov <- as.data.frame(stravaMean)
+
+
 ##################
 ## Save covariates
-save(hDensCov, elevCov, triCov, hfiCov,
+save(hDensCov, elevCov, triCov, hfiCov, stravaCov,
      file = "outputs/covariatesOthers1km.RData")
 
 ########################################################################
