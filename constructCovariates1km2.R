@@ -454,6 +454,24 @@ triCells <- elevTRI %>%
   terra::extract(., st_centroid(grid1Tr))
 triCov <- cbind.data.frame(ID = grid1Tr$ID, tri = triCells[, 2])
 
+# Other index of ruggedness: VRM (Vector Ruggedness Measure; Sappington 2007)
+# Compute VRM on 1 km2 cells (same resolution as TRI)
+elevVRM <- vrm(elevAggr, s = c(3, 3)) # use of a 3x3 window to be similar to TRI
+
+# Compute the number of 1 km2 "rugged cells" into 100 km2 cells
+elevVRM[elevVRM < 0.005] <- 0 # 0.005 = medium rugged surface as mean values of mountains = 0.01 (Sappington)
+elevVRM[elevVRM >= 0.005] <- 1
+vrmCells <- elevVRM %>% 
+  terra::extract(., st_centroid(grid1Tr))
+vrmCov <- cbind.data.frame(ID = grid1Tr$ID, vrm005 = vrmCells[ ,2])
+
+# Trying with another (lower) threshold to obtain a more heterogeous surface
+elevVRM[elevVRM < 0.0001] <- 0 
+elevVRM[elevVRM >= 0.0001] <- 1
+vrmCells <- elevVRM %>% 
+  terra::extract(., st_centroid(grid1Tr))
+vrmCov <- cbind.data.frame(vrmCov, vrm0001 = vrmCells[ ,2])
+
 
 ################
 ## TALLY DATA ##
@@ -513,7 +531,7 @@ stravaCov <- as.data.frame(stravaMean)
 
 ##################
 ## Save covariates
-save(hDensCov, elevCov, triCov, hfiCov, stravaCov,
+save(hDensCov, elevCov, triCov, vrmCov, hfiCov, stravaCov,
      file = "outputs/covariatesOthers1km.RData")
 
 ########################################################################
