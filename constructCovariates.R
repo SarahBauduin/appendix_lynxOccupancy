@@ -433,9 +433,64 @@ vrmCells <- elevVRM_100km2 %>%
 vrmCov <- cbind.data.frame(vrmCov, vrm0001 = vrmCells[ ,2])
 
 
-################
-## TALLY DATA ##
-################
+###############
+## PREY DATA ##
+###############
+
+
+#########
+# Chamois
+chamData <- st_read("data/ungulates/chamois/chamois_effectif.shp")
+gridFrCompleteTr <- st_transform(gridFrComplete, st_crs(chamData))
+
+# Estimate chamois density per m2
+chamData <- chamData %>% 
+  mutate(area = st_area(.)) %>% 
+  mutate(densCham = effectif_m / area) %>% 
+  st_intersection(gridFrCompleteTr)
+
+# Sum the density inside each grid cell
+cham1993 <- chamData %>% 
+  filter(annee_effe == 1993) %>% 
+  group_by(ID) %>% 
+  summarise(dens1993 = sum(densCham, na.rm = TRUE))
+
+cham2005 <- chamData %>% 
+  filter(annee_effe == 2005) %>% 
+  group_by(ID) %>% 
+  summarise(dens2005 = sum(densCham, na.rm = TRUE))
+
+cham2010 <- chamData %>% 
+  filter(annee_effe == 2010) %>% 
+  group_by(ID) %>% 
+  summarise(dens2010 = sum(densCham, na.rm = TRUE))
+
+# Replace NA by 0 (no chamois there)
+gridFrCompleteTr <- merge(gridFrCompleteTr, st_drop_geometry(cham1993[,c("ID", "dens1993")]), all = TRUE) %>% 
+  mutate(dens1993 = ifelse(is.na(dens1993), 0, dens1993))
+gridFrCompleteTr <- merge(gridFrCompleteTr, st_drop_geometry(cham2005[,c("ID", "dens2005")]), all = TRUE) %>% 
+  mutate(dens2005 = ifelse(is.na(dens2005), 0, dens2005))
+gridFrCompleteTr <- merge(gridFrCompleteTr, st_drop_geometry(cham2010[,c("ID", "dens2010")]), all = TRUE) %>% 
+  mutate(dens2010 = ifelse(is.na(dens2010), 0, dens2010))
+
+# Add spatial autocorrelation by averaging the 9 cells in each 3x3 cells square
+gridFrCompleteRef <- gridFrCompleteTr
+gridFrCompleteBuff <- gridFrCompleteTr[,"ID"] %>% 
+  st_buffer(dist = 10000) %>% 
+  st_intersection(gridFrCompleteRef) %>% 
+  group_by(ID) %>% 
+  summarise(dens1993AS = mean(dens1993), dens2005AS = mean(dens2005), dens2010AS = mean(dens2010))
+
+chamCov <- cbind.data.frame(ID = gridFrCompleteBuff$ID, 
+                            cham1993 = gridFrCompleteBuff$dens1993AS,
+                            cham2005 = gridFrCompleteBuff$dens2005AS,
+                            cham2010 = gridFrCompleteBuff$dens2010AS)
+
+
+######
+# Deer
+
+deerCov <- 
 
 
 ###########################

@@ -169,3 +169,9 @@ outputs/lynxMCP100_dist2_noPreys.RData
 outputs/lynxMCP100_dist_noPreys.RData
 outputs/preyTemp1km.RData
 data/lynx/agentsIndicesOCS.RData
+data/ungulates/chamois/chamois_effectif.cpg
+data/ungulates/chamois/chamois_effectif.dbf
+data/ungulates/chamois/chamois_effectif.prj
+data/ungulates/chamois/chamois_effectif.qmd
+data/ungulates/chamois/chamois_effectif.shp
+data/ungulates/chamois/chamois_effectif.shx

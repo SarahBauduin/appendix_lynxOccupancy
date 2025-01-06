@@ -2,3 +2,9 @@ Data downloaded from:
 https://carmen.carmencarto.fr/38/Chevreuil.map#
 https://carmen.carmencarto.fr/38/Chamois.map#
 Downloaded on 2023/10/25
+
+Chamois data given by the OFB
+Estimate of population size per area (polygons)
+https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_1993_france.png
+https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_2005_france.png
+https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_2010_france.png
