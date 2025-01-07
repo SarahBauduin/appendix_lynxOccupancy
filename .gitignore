@@ -176,3 +176,9 @@ data/ungulates/chamois/chamois_effectif.qmd
 data/ungulates/chamois/chamois_effectif.shp
 data/ungulates/chamois/chamois_effectif.shx
 data/ungulates/deer/enq_comm_chevreuil_chamois_oct_2024.csv
+data/ungulates/deer/communes-20220101-shp/communes-20220101.cpg
+data/ungulates/deer/communes-20220101-shp/communes-20220101.dbf
+data/ungulates/deer/communes-20220101-shp/communes-20220101.prj
+data/ungulates/deer/communes-20220101-shp/communes-20220101.shp
+data/ungulates/deer/communes-20220101-shp/communes-20220101.shx
+data/ungulates/deer/communes-20220101-shp/communes-descriptif.txt
