@@ -8,3 +8,9 @@ Estimate of population size per area (polygons)
 https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_1993_france.png
 https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_2005_france.png
 https://professionnels.ofb.fr/sites/default/files/pdf/suivi/Synthese_suivi_chamois_2010_france.png
+
+Deer data given by the OFB
+Estimate of hunting bag per district in France
+French districts data ("communes-20220101-shp") come from OpenStreetMap 
+
+grid_comm_intersect is the intersection of the grid and the french districts

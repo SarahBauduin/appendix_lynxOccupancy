@@ -490,7 +490,93 @@ chamCov <- cbind.data.frame(ID = gridFrCompleteBuff$ID,
 ######
 # Deer
 
-deerCov <- 
+# Deer data (hunting bags) per french districts
+deerDistrictsData <- read.csv("data/ungulates/deer/enq_comm_chevreuil_chamois_oct_2024.csv", header = TRUE, sep = ",")
+deerDistrictsData <- deerDistrictsData[deerDistrictsData$espece == "Chevreuil                ",]
+# French districts
+frDistricts <- st_read("data/ungulates/deer/communes-20220101-shp/communes-20220101.shp")
+# Merge the deer data with the district shapefile based on the insee number for each year
+for(year in unique(deerDistrictsData$annee)){
+  deerYear <- deerDistrictsData[deerDistrictsData$annee == year, c("insee", "realisations")]
+  colnames(deerYear) <- c("insee", paste0("realisations_", year))
+  frDistricts <- merge(frDistricts, deerYear[,1:2], all = TRUE)
+}
+gridFrCompleteTr <- st_transform(gridFrComplete, st_crs(frDistricts))
+
+# Divide the deer data into two time periods
+deerData <- frDistricts %>% 
+  mutate(meanAllYears = rowMeans(st_drop_geometry(frDistricts[,5:27]), na.rm = TRUE)) %>% 
+  mutate(meanFirstPeriod = rowMeans(st_drop_geometry(frDistricts[,6:11]), na.rm = TRUE)) %>%  # 1993-2007
+  mutate(meanScndPeriod = rowMeans(st_drop_geometry(frDistricts[,12:27]), na.rm = TRUE)) %>%  # 2012-2023
+  st_crop(., gridFrCompleteTr) %>% 
+  mutate(area = st_area(.)) %>% 
+  mutate(densAllYears = meanAllYears / area) %>% 
+  mutate(densFP = meanFirstPeriod / area) %>% 
+  mutate(densSP = meanScndPeriod / area) 
+
+# Grid intersected with the french districts
+disGrid <- st_read("data/ungulates/deer/grid_comm_intersect/intersection_commShp2_gridFrComplete2.shp")
+disGridFull <- disGrid %>% 
+  merge(st_drop_geometry(deerData[,c(1, 33:35)]), all = TRUE) %>% 
+  mutate(newArea = st_area(.)) %>% 
+  mutate(partDensAllY = densAllYears * newArea) %>% 
+  mutate(partDensFP = densFP * newArea) %>% 
+  mutate(partDensSP = densSP * newArea) %>% 
+  group_by(ID) %>% 
+  summarise(meanDensAllYPerCell = sum(partDensAllY), meanDensFPPerCell = sum(partDensFP), meanDensSPPerCell = sum(partDensSP), sumArea = sum(newArea))
+
+# For incomplete cell (i.e., less than 90000000 for the area - missing 10%) or those with NA, we take the mean
+ID10percent <- st_drop_geometry(disGridFull[as.numeric(disGridFull$sumArea) < 90000000, "ID"])
+IDNA_allY <- unique(c(ID10percent$ID, st_drop_geometry(disGridFull[is.na(disGridFull$meanDensAllYPerCell), "ID"]$ID)))
+IDNA_FP <-  unique(c(ID10percent$ID, st_drop_geometry(disGridFull[is.na(disGridFull$meanDensFPPerCell), "ID"]$ID)))
+IDNA_SP <-  unique(c(ID10percent$ID, st_drop_geometry(disGridFull[is.na(disGridFull$meanDensSPPerCell), "ID"]$ID)))
+missingAllY <- disGrid %>% 
+  merge(st_drop_geometry(deerData[,c(1, 33)]), all = TRUE) %>% 
+  filter(ID %in% IDNA_allY[!is.na(IDNA_allY)]) %>% 
+  group_by(ID) %>% 
+  summarise(meanDensAllYPerCell = (mean(densAllYears, na.rm = TRUE)) * 100000000)
+missingFP <- disGrid %>% 
+  merge(st_drop_geometry(deerData[,c(1, 34)]), all = TRUE) %>% 
+  filter(ID %in% IDNA_FP[!is.na(IDNA_FP)]) %>% 
+  group_by(ID) %>% 
+  summarise(meanDensFPPerCell = (mean(densFP, na.rm = TRUE)) * 100000000)
+missingSP <- disGrid %>% 
+  merge(st_drop_geometry(deerData[,c(1, 35)]), all = TRUE) %>% 
+  filter(ID %in% IDNA_SP[!is.na(IDNA_SP)]) %>% 
+  group_by(ID) %>% 
+  summarise(meanDensSPPerCell = (mean(densSP, na.rm = TRUE)) * 100000000)
+
+# Put these new estimates
+disGridFull <- disGridFull %>% 
+  mutate(meanDensAllYPerCell = ifelse(ID %in% IDNA_allY[!is.na(IDNA_allY)], missingAllY$meanDensAllYPerCell, meanDensAllYPerCell)) %>% 
+  mutate(meanDensFPPerCell = ifelse(ID %in% IDNA_FP[!is.na(IDNA_FP)], missingFP$meanDensFPPerCell, meanDensFPPerCell)) %>% 
+  mutate(meanDensSPPerCell = ifelse(ID %in% IDNA_SP[!is.na(IDNA_SP)], missingSP$meanDensSPPerCell, meanDensSPPerCell))
+
+# Remove the few outliers
+tail(disGridFull$meanDensAllYPerCell[order(disGridFull$meanDensAllYPerCell)])
+disGridFull[!is.na(disGridFull$meanDensAllYPerCell) & disGridFull$meanDensAllYPerCell > 407, "meanDensAllYPerCell"] <- 407
+tail(disGridFull$meanDensFPPerCell[order(disGridFull$meanDensFPPerCell)][!is.na(disGridFull$meanDensFPPerCell[order(disGridFull$meanDensFPPerCell)])])
+disGridFull[!is.na(disGridFull$meanDensFPPerCell) & disGridFull$meanDensFPPerCell > 409, "meanDensFPPerCell"] <- 409
+tail(disGridFull$meanDensSPPerCell[order(disGridFull$meanDensSPPerCell)][!is.na(disGridFull$meanDensSPPerCell[order(disGridFull$meanDensSPPerCell)])])
+disGridFull[!is.na(disGridFull$meanDensSPPerCell) & disGridFull$meanDensSPPerCell > 426, "meanDensSPPerCell"] <- 426
+
+# Reassign to the original grid
+gridDeer <- merge(gridFrComplete, st_drop_geometry(disGridFull), all = TRUE)
+gridDeer <- gridDeer %>% 
+  filter(!is.na(ID))
+
+# Add spatial autocorrelation by averaging the 9 cells in each 3x3 cells square
+gridFrRef <- gridFrComplete
+gridFrCompleteBuff <- gridFrComplete[,"ID"] %>% 
+  st_buffer(dist = 10000) %>% 
+  st_intersection(gridDeer[,c("meanDensAllYPerCell", "meanDensFPPerCell", "meanDensSPPerCell")]) %>% 
+  group_by(ID) %>% 
+  summarise(deerAllYears = mean(meanDensAllYPerCell, na.rm = TRUE), deerFirstPeriod = mean(meanDensFPPerCell, na.rm = TRUE), deerSecondPeriod = mean(meanDensSPPerCell, na.rm = TRUE))
+
+deerCov <- cbind.data.frame(ID = gridFrCompleteBuff$ID, 
+                            deerAllY = gridFrCompleteBuff$deerAllYears,
+                            deerFP = gridFrCompleteBuff$deerFirstPeriod,
+                            deerSP = gridFrCompleteBuff$deerSecondPeriod)
 
 
 ###########################
