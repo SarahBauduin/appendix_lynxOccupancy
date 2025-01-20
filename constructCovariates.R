@@ -22,9 +22,18 @@ library(osmextract)
 load("data/gridFrCompleteCrop.RData")
 gridFrComplete <- st_as_sf(gridFrComplete)
 
-##########################
-## LANDSCAPE COVER DATA ##
-##########################
+
+####################
+####################
+## LANDSCAPE DATA ##
+####################
+####################
+
+
+#####################
+## LANDSCAPE COVER ##
+#####################
+
 # CLC data from 1990, 2000, 2006, 2012 and 2018
 clc1990 <- st_read("data/CLC/CLC1990/CLC90_FR_RGF.shp")
 clc2000 <- st_read("data/CLC/CLC2000/CLC00_FR_RGF.shp")
@@ -209,178 +218,11 @@ agri24Cov <- extractPropCLC(codesCLC = c("241", "242", "243", "244"))
 colnames(agri24Cov) <- c("ID", "agri24_1990", "agri24_2000", "agri24_2006", "agri24_2012", "agri24_2018")
 
 
-##################
-## Save covariates
-save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, 
-     agri23Cov, agri24Cov, file = "outputs/covariatesCover.RData")
 
-##########################################################
+###############
+## ELEVATION ##
+###############
 
-
-#################
-## LINEAR DATA ##
-#################
-# Route500 data from 2012, 2015, and 2018 for the main roads
-roads2012 <- st_read("data/route500/2012/TRONCON_ROUTE.shp")
-roads2015 <- st_read("data/route500/2015/TRONCON_ROUTE.shp")
-roads2018 <- st_read("data/route500/2018/TRONCON_ROUTE.shp")
-# OpenStreetMap from 2014, 2019, 2023 for the paths
-france2014 <- oe_read("data/openStreetMap/france-140101.osm.pbf")
-france2019 <- oe_read("data/openStreetMap/france-190101.osm.pbf")
-france2023 <- oe_read("data/openStreetMap/france-230101.osm.pbf")
-
-# Highways from 2014
-highways <- st_read("data/highways/cropHighways.shp") 
-# not to the exact extent of the grid to calculate closest highway which may be outside of the grid extent
-
-
-#######################
-## Distance to highways
-highwaysTr <- highways %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  st_union(.)
-
-# Cell centroids
-gridCentroid <- st_centroid(gridFrComplete)
-# Distance for each centroid
-distHgwsCells <- st_distance(gridCentroid, highwaysTr)
-distHgwCov <- cbind.data.frame(ID = gridFrComplete$ID, distHgws = as.numeric(distHgwsCells))
-
-
-##############
-## Road length 
-roads2012Tr <- roads2012 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-roads2015Tr <- roads2015 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-roads2018Tr <- roads2018 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-listRoads <- list()
-listRoads[[1]] <- roads2012Tr
-listRoads[[2]] <- roads2015Tr
-listRoads[[3]] <- roads2018Tr
-
-# Total road length in each cell
-roadLengthCov <- data.frame(ID = gridFrComplete$ID)
-
-for(i in 1:length(listRoads)){
-  
-  roadsIn <- st_intersection(gridFrComplete, listRoads[[i]]) %>% # extract all the roads inside each cell
-    mutate(x = st_length(.)) # calculate the length of each type of road per cell ID
-  lengthRoadsCells <- st_drop_geometry(roadsIn)[,c("ID","x")]
-  lengthRoadsCells$x <- as.numeric(lengthRoadsCells$x)
-  
-  # Not all cells had roads in it
-  withoutRoads <- setdiff(gridFrComplete$ID, lengthRoadsCells$ID) # cells without roads in it
-  lengthRoadsID <- c(lengthRoadsCells$ID, withoutRoads)
-  lengthRoads <- c(lengthRoadsCells$x, rep(0, length(withoutRoads))) # put 0 as the length of roads in the empty cells
-  lengthRoadsOrder <- cbind(lengthRoadsID, lengthRoads)
-  lengthRoadsOrderID <- lengthRoadsOrder[order(match(lengthRoadsOrder[,"lengthRoadsID"] ,gridFrComplete$ID)),]
-  
-  roadLengthCov <- cbind.data.frame(roadLengthCov, as.data.frame(lengthRoadsOrderID)[,"lengthRoads"])
-  if(i == 1){
-    colnames(roadLengthCov)[i+1] <- "roadLength2012"
-  } else if(i == 2){
-    colnames(roadLengthCov)[i+1] <- "roadLength2015"
-  } else if(i == 3){
-    colnames(roadLengthCov)[i+1] <- "roadLength2018"
-  }
-  print(i)
-}
-
-
-##############
-## Path length 
-path2014Tr <- france2014 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-path2019Tr <- france2019 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-path2023Tr <- france2023 %>%
-  st_transform(crs = st_crs(gridFrComplete)) %>% 
-  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
-  st_crop(., gridFrComplete) %>% 
-  st_union(.)
-listPaths <- list()
-listPaths[[1]] <- path2014Tr
-listPaths[[2]] <- path2019Tr
-listPaths[[3]] <- path2023Tr
-
-# Total path length in each cell
-pathLengthCov <- data.frame(ID = gridFrComplete$ID)
-
-for(i in 1:length(listPaths)){
-  
-  pathIn <- st_intersection(gridFrComplete, listPaths[[i]]) %>% # extract all the path inside each cell
-    mutate(x = st_length(.)) # calculate the length of the paths per cell ID
-  lengthPathCells <- st_drop_geometry(pathIn)[,c("ID","x")]
-  lengthPathCells$x <- as.numeric(lengthPathCells$x)
-  
-  # Not all cells had path in it
-  withoutPath <- setdiff(gridFrComplete$ID, lengthPathCells$ID) # cells without path in it
-  lengthPathID <- c(lengthPathCells$ID, withoutPath)
-  lengthPaths <- c(lengthPathCells$x, rep(0, length(withoutPath))) # put 0 as the length of path in the empty cells
-  lengthPathsOrder <- cbind(lengthPathID, lengthPaths)
-  lengthPathsOrderID <- lengthPathsOrder[order(match(lengthPathsOrder[,"lengthPathID"] ,gridFrComplete$ID)),]
-  
-  pathLengthCov <- cbind.data.frame(pathLengthCov, as.data.frame(lengthPathsOrderID)[,"lengthPaths"])
-  if(i == 1){
-    colnames(pathLengthCov)[i+1] <- "pathLength2014"
-  } else if(i == 2){
-    colnames(pathLengthCov)[i+1] <- "pathLength2019"
-  } else if(i == 3){
-    colnames(pathLengthCov)[i+1] <- "pathLength2023"
-  }
-  print(i)
-}
-
-
-##################
-## Save covariates
-save(distHgwCov, roadLengthCov, pathLengthCov, 
-     file = "outputs/covariatesRoads.RData")
-
-###############################################################
-
-
-###########################
-## HUMAN POPULATION DATA ##
-###########################
-# Human density for cells of 1km2 in 2017
-human_sf <- st_read("data/humanPop/2017/Filosofi2017_carreaux_1km_met.shp")
-
-gridFr_sf <- gridFrComplete %>%
-  st_transform(crs = st_crs(human_sf))
-
-
-################
-## Human density
-# Compute the mean human density (1km2) into the 100km2 cells
-humanDens <- st_intersection(gridFr_sf , human_sf) %>%
-  group_by(ID) %>%
-  summarise(humanDens1km2 = mean(Ind, na.rm = TRUE)) %>%
-  as_tibble() %>%
-  dplyr::select(ID, humanDens1km2)
-# Fill with 0 the missing data
-hDensCov <- data.frame(ID = gridFrComplete$ID)
-hDensCov <- merge(hDensCov, as.data.frame(humanDens), all = TRUE)
-hDensCov[is.na(hDensCov)] <- 0
-
-
-####################
-## ELEVATION DATA ##
-####################
 # Elevation data on 25 m x 25 m resolution
 elev1 <- rast("data/elevation/032ab314564b9cb72c98fbeb093aeaf69720fbfd/eu_dem_v11_E30N20.TIF") 
 gridFrCompleteTr <- gridFrComplete %>%
@@ -389,6 +231,10 @@ elev1 <- terra::crop(elev1, st_sf(st_union(gridFrCompleteTr)))
 elev2 <- rast("data/elevation/97824c12f357f50638d665b5a58707cd82857d57/eu_dem_v11_E40N20.TIF")
 elev2 <- terra::crop(elev2, st_sf(st_union(gridFrCompleteTr)))
 elevation <- terra::merge(elev1, elev2)
+
+
+############
+## Elevation
 
 # Compute mean and sd elevation on 100 km2 cells
 elevMean <- elevation %>% 
@@ -400,6 +246,7 @@ elevCov <- as.data.frame(elevMean)
 
 #############
 ## Ruggedness
+
 # Compute TRI (terrain ruggedness index) on 1 km2 cells
 elevAggr <- terra::aggregate(elevation, fact = 40, fun = "mean", na.rm = TRUE)
 elevTRI <- tri(elevAggr)
@@ -436,7 +283,6 @@ vrmCov <- cbind.data.frame(vrmCov, vrm0001 = vrmCells[ ,2])
 ###############
 ## PREY DATA ##
 ###############
-
 
 #########
 # Chamois
@@ -579,19 +425,196 @@ deerCov <- cbind.data.frame(ID = gridFrCompleteBuff$ID,
                             deerSP = gridFrCompleteBuff$deerSecondPeriod)
 
 
-###########################
-## HUMAN FOOTPRINT INDEX ##
-###########################
-# HFI data
+
+##################
+## Save covariates
+save(forestCov, connectForCov, shrubCov, openLandCov, agri21Cov, agri22Cov, agri23Cov, agri24Cov, 
+     elevCov, triCov, vrmCov,
+     chamCov, deerCov,
+     file = "outputs/covLandscape.RData")
+
+##########################################################
+
+
+
+#################
+#################
+## LINEAR DATA ##
+#################
+#################
+
+# Route500 data from 2012, 2015, and 2018 for the main roads
+roads2012 <- st_read("data/route500/2012/TRONCON_ROUTE.shp")
+roads2015 <- st_read("data/route500/2015/TRONCON_ROUTE.shp")
+roads2018 <- st_read("data/route500/2018/TRONCON_ROUTE.shp")
+# OpenStreetMap from 2014, 2019, 2023 for the paths
+france2014 <- oe_read("data/openStreetMap/france-140101.osm.pbf")
+france2019 <- oe_read("data/openStreetMap/france-190101.osm.pbf")
+france2023 <- oe_read("data/openStreetMap/france-230101.osm.pbf")
+
+# Highways from 2014
+highways <- st_read("data/highways/cropHighways.shp") 
+# not to the exact extent of the grid to calculate closest highway which may be outside of the grid extent
+
+
+#######################
+## Distance to highways
+highwaysTr <- highways %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  st_union(.)
+
+# Cell centroids
+gridCentroid <- st_centroid(gridFrComplete)
+# Distance for each centroid
+distHgwsCells <- st_distance(gridCentroid, highwaysTr)
+distHgwCov <- cbind.data.frame(ID = gridFrComplete$ID, distHgws = as.numeric(distHgwsCells))
+
+
+##############
+## Road length 
+roads2012Tr <- roads2012 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+roads2015Tr <- roads2015 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+roads2018Tr <- roads2018 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+listRoads <- list()
+listRoads[[1]] <- roads2012Tr
+listRoads[[2]] <- roads2015Tr
+listRoads[[3]] <- roads2018Tr
+
+# Total road length in each cell
+roadLengthCov <- data.frame(ID = gridFrComplete$ID)
+
+for(i in 1:length(listRoads)){
+  
+  roadsIn <- st_intersection(gridFrComplete, listRoads[[i]]) %>% # extract all the roads inside each cell
+    mutate(x = st_length(.)) # calculate the length of each type of road per cell ID
+  lengthRoadsCells <- st_drop_geometry(roadsIn)[,c("ID","x")]
+  lengthRoadsCells$x <- as.numeric(lengthRoadsCells$x)
+  
+  # Not all cells had roads in it
+  withoutRoads <- setdiff(gridFrComplete$ID, lengthRoadsCells$ID) # cells without roads in it
+  lengthRoadsID <- c(lengthRoadsCells$ID, withoutRoads)
+  lengthRoads <- c(lengthRoadsCells$x, rep(0, length(withoutRoads))) # put 0 as the length of roads in the empty cells
+  lengthRoadsOrder <- cbind(lengthRoadsID, lengthRoads)
+  lengthRoadsOrderID <- lengthRoadsOrder[order(match(lengthRoadsOrder[,"lengthRoadsID"] ,gridFrComplete$ID)),]
+  
+  roadLengthCov <- cbind.data.frame(roadLengthCov, as.data.frame(lengthRoadsOrderID)[,"lengthRoads"])
+  if(i == 1){
+    colnames(roadLengthCov)[i+1] <- "roadLength2012"
+  } else if(i == 2){
+    colnames(roadLengthCov)[i+1] <- "roadLength2015"
+  } else if(i == 3){
+    colnames(roadLengthCov)[i+1] <- "roadLength2018"
+  }
+  print(i)
+}
+
+
+##############
+## Path length 
+path2014Tr <- france2014 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+path2019Tr <- france2019 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+path2023Tr <- france2023 %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  filter(highway %in% c("track", "footway", "bridleway", "path", "cylceway")) %>% 
+  st_crop(., gridFrComplete) %>% 
+  st_union(.)
+listPaths <- list()
+listPaths[[1]] <- path2014Tr
+listPaths[[2]] <- path2019Tr
+listPaths[[3]] <- path2023Tr
+
+# Total path length in each cell
+pathLengthCov <- data.frame(ID = gridFrComplete$ID)
+
+for(i in 1:length(listPaths)){
+  
+  pathIn <- st_intersection(gridFrComplete, listPaths[[i]]) %>% # extract all the path inside each cell
+    mutate(x = st_length(.)) # calculate the length of the paths per cell ID
+  lengthPathCells <- st_drop_geometry(pathIn)[,c("ID","x")]
+  lengthPathCells$x <- as.numeric(lengthPathCells$x)
+  
+  # Not all cells had path in it
+  withoutPath <- setdiff(gridFrComplete$ID, lengthPathCells$ID) # cells without path in it
+  lengthPathID <- c(lengthPathCells$ID, withoutPath)
+  lengthPaths <- c(lengthPathCells$x, rep(0, length(withoutPath))) # put 0 as the length of path in the empty cells
+  lengthPathsOrder <- cbind(lengthPathID, lengthPaths)
+  lengthPathsOrderID <- lengthPathsOrder[order(match(lengthPathsOrder[,"lengthPathID"] ,gridFrComplete$ID)),]
+  
+  pathLengthCov <- cbind.data.frame(pathLengthCov, as.data.frame(lengthPathsOrderID)[,"lengthPaths"])
+  if(i == 1){
+    colnames(pathLengthCov)[i+1] <- "pathLength2014"
+  } else if(i == 2){
+    colnames(pathLengthCov)[i+1] <- "pathLength2019"
+  } else if(i == 3){
+    colnames(pathLengthCov)[i+1] <- "pathLength2023"
+  }
+  print(i)
+}
+
+
+##################
+## Save covariates
+save(distHgwCov, roadLengthCov, pathLengthCov, 
+     file = "outputs/covLinear.RData")
+
+###############################################################
+
+
+
+########################
+########################
+## HUMAN DISTURBANCES ##
+########################
+########################
+
+
+################
+## Human density
+
+# Human density for cells of 1km2 in 2017
+human_sf <- st_read("data/humanPop/2017/Filosofi2017_carreaux_1km_met.shp")
+
+gridFr_sf <- gridFrComplete %>%
+  st_transform(crs = st_crs(human_sf))
+
+# Compute the mean human density (1km2) into the 100km2 cells
+humanDens <- st_intersection(gridFr_sf , human_sf) %>%
+  group_by(ID) %>%
+  summarise(humanDens1km2 = mean(Ind, na.rm = TRUE)) %>%
+  as_tibble() %>%
+  dplyr::select(ID, humanDens1km2)
+# Fill with 0 the missing data
+hDensCov <- data.frame(ID = gridFrComplete$ID)
+hDensCov <- merge(hDensCov, as.data.frame(humanDens), all = TRUE)
+hDensCov[is.na(hDensCov)] <- 0
+
+
+#######################
+# Human Footprint Index
+
 hfi_1993 <- rast("data/HFI/1993/wildareas-v3-1993-human-footprint.tif")
 hfi_2009 <- rast("data/HFI/2009/wildareas-v3-2009-human-footprint.tif")
 # 50 is the maximum value on land, then 128 is given for water areas
 hfi_1993[hfi_1993 == 128] <- 25 # gives a medium value
 hfi_2009[hfi_2009 == 128] <- 25
 
-
-####################
-## Human disturbance 
 gridFr_sf <- gridFrComplete %>%
   st_transform(crs = crs(hfi_1993))
 # Mean HFI per grid cells
@@ -604,9 +627,23 @@ hfiCov <- cbind.data.frame(ID = gridFrComplete$ID,
 
 
 ############
-## STRAVA ##
-############
+# Nightlight
+light <- rast("data/nightlight/VNL_npp_2023_global_vcmslcfg_v2_c202402081600.average.dat.tif/VNL_npp_2023_global_vcmslcfg_v2_c202402081600.average.dat.tif")
+gridFr_sf <- gridFrComplete %>%
+  st_transform(crs = crs(light))
+
+# Crop the nightlight data to the grid extent
+lightFr <- crop(light, extent(gridFr_sf))
+# Mean light per grid cells
+lightCells <- terra::extract(lightFr, gridFr_sf, fun = mean)
+
+lightCov <- cbind.data.frame(ID = gridFrComplete$ID, 
+                             light = lightCells[, 2])
+
+
+########
 # Strava
+# Strave records outdoor activities
 strava <- rast("data/strava/heatmap_strava_20220414_100_all.tiff")
 # 4 layers
 # layer 1 = all
@@ -629,10 +666,17 @@ stravaMean <- strava %>%
 stravaCov <- as.data.frame(stravaMean)
 
 
+################
+# Outdoor vision
+# Another type of data recording outdoor activities
+
+outVisCov
+
+
 ##################
 ## Save covariates
-save(hDensCov, elevCov, triCov, vrmCov, hfiCov, stravaCov,
-     file = "outputs/covariatesOthers.RData")
+save(hDensCov, hfiCov, lightCov, stravaCov, outVisCov,
+     file = "outputs/covHuman.RData")
 
 ########################################################################
 
