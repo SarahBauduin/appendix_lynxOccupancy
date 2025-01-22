@@ -184,3 +184,7 @@ data/ungulates/deer/communes-20220101-shp/communes-20220101.shx
 data/ungulates/deer/communes-20220101-shp/communes-descriptif.txt
 data/nightlight/VNL_npp_2023_global_vcmslcfg_v2_c202402081600.average.dat.tif/VNL_npp_2023_global_vcmslcfg_v2_c202402081600.average.dat.tif
 data/strava/heatmap_strava_20220414_100_all.tiff
+data/river/TronconHydrograElt_FXX.shp/TronconHydrograElt_FXX.dbf
+data/river/TronconHydrograElt_FXX.shp/TronconHydrograElt_FXX.prj
+data/river/TronconHydrograElt_FXX.shp/TronconHydrograElt_FXX.shp
+data/river/TronconHydrograElt_FXX.shp/TronconHydrograElt_FXX.shx
