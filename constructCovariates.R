@@ -456,6 +456,8 @@ france2023 <- oe_read("data/openStreetMap/france-230101.osm.pbf")
 highways <- st_read("data/highways/cropHighways.shp") 
 # not to the exact extent of the grid to calculate closest highway which may be outside of the grid extent
 
+# Rivers
+rivers <- st_read("data/river/TronconHydrograElt_FXX.shp/TronconHydrograElt_FXX.shp")
 
 #######################
 ## Distance to highways
@@ -468,6 +470,18 @@ gridCentroid <- st_centroid(gridFrComplete)
 # Distance for each centroid
 distHgwsCells <- st_distance(gridCentroid, highwaysTr)
 distHgwCov <- cbind.data.frame(ID = gridFrComplete$ID, distHgws = as.numeric(distHgwsCells))
+
+
+#####################
+## Distance to rivers
+riversTr <- rivers %>%
+  st_transform(crs = st_crs(gridFrComplete)) %>% 
+  # Removing dried and underground rivers
+  filter(Etat %in% c("En attente de mise à jour", "Inconnu", "Intermittent", "Permanent")) %>% 
+  st_union(.)
+# Distance for each centroid
+distRiverCells <- st_distance(gridCentroid, riversTr)
+distRiverCov <- cbind.data.frame(ID = gridFrComplete$ID, distRiver = as.numeric(distRiverCells))
 
 
 ##############
@@ -571,7 +585,7 @@ for(i in 1:length(listPaths)){
 
 ##################
 ## Save covariates
-save(distHgwCov, roadLengthCov, pathLengthCov, 
+save(distHgwCov, distRiverCov, roadLengthCov, pathLengthCov, 
      file = "outputs/covLinear.RData")
 
 ###############################################################
@@ -643,7 +657,7 @@ lightCov <- cbind.data.frame(ID = gridFrComplete$ID,
 
 ########
 # Strava
-# Strave records outdoor activities
+# Strava records outdoor activities
 strava <- rast("data/strava/heatmap_strava_20220414_100_all.tiff")
 # 4 layers
 # layer 1 = all
